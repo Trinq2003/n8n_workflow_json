@@ -1,0 +1,2625 @@
+{
+  "name": "Knowledge Graph Construction Workflow | Version 1",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a7cf8681-3a5c-498b-b9eb-76882ca836d8",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -40,
+        -120
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "destinationKey": "markdown_data",
+        "options": {
+          "encoding": "utf8"
+        }
+      },
+      "id": "6f126b56-7001-43dd-b599-849ea2ebda58",
+      "name": "Extract from File",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        1940,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "language": "python",
+        "pythonCode": "import re\n\nraw_lines = _input.all()[0].json.markdown_data.split(\"\\n\")\nlines = [raw_line + \"\\n\" for raw_line in raw_lines]\n\ndef remove_emphasis(text):\n  clean_text = re.sub(r\"\\*\\*\", \"\", text)\n  clean_text = re.sub(r\"(\\*{1,3}|_{1,3})(.*?)(\\1)\", r'\\2', clean_text)\n  return clean_text\n\ncombined_lines = []\ninside_code_block = False\nparagraph = \"\"\n  \nfor line in lines:\n  stripped_line = remove_emphasis(line.rstrip())\n\n  if stripped_line.startswith(\"```\"):\n    if inside_code_block:\n      inside_code_block = False\n      if paragraph:\n        combined_lines.append(paragraph + '\\n')\n        paragraph = \"\"\n    else:\n      inside_code_block = True\n    \n    combined_lines.append(line)\n    continue\n\n  if inside_code_block:\n    combined_lines.append(line)\n    continue\n\n  if not stripped_line or stripped_line[0] in '#1234567890!{}[`*|- \\n\\t':\n    if paragraph:\n      combined_lines.append(paragraph + '\\n')\n      paragraph = \"\"\n    combined_lines.append(line)\n  else:\n    if paragraph:\n      paragraph += ' ' + stripped_line\n    else:\n      paragraph = stripped_line\n\nif paragraph:\n  combined_lines.append(paragraph + '\\n')\n\nprocessed_markdown = \"\".join(combined_lines)\noriginal_links = {}\noriginal_images = {}\noriginal_code_blocks = {}\n\n# Replace links by placeholders\nlinks = re.findall(r'\\[([^\\]]+)\\]\\((https?://[^\\)]+)\\)', processed_markdown)\nfor index, (text, url) in enumerate(links, start=1):\n  placeholder = f\"<|LINK_{index}|>\"\n  original_link = f\"[{text}]({url})\"\n  original_links[placeholder] = original_link\n  processed_markdown = processed_markdown.replace(original_link, placeholder)\n  \n# Replace images by placeholders\nimages = re.findall(r'!\\[([^\\]]*)\\]\\(([^)]+)\\)', processed_markdown)\nfor index, (alt_text, img_path) in enumerate(images, start=1):\n  placeholder = f\"<|IMAGE_{index}|>\"\n  original_image = f\"![{alt_text}]({img_path})\"\n  original_images[placeholder] = original_image\n  processed_markdown = processed_markdown.replace(original_image, placeholder)\n\n# Replace code blocks by placeholders\ncode_blocks = re.findall(r'```[\\s\\S]*?```', processed_markdown)\nfor index, code in enumerate(code_blocks, start=1):\n  placeholder = f\"<|CODE_{index}|>\"\n  original_code_blocks[placeholder] = code\n  processed_markdown = processed_markdown.replace(code, placeholder)\n\norginal_special_content = {\n  'original_links': original_links,\n  'original_images': original_images,\n  'original_code_blocks': original_code_blocks\n}\n\nprocessed_markdown = remove_emphasis(processed_markdown)\nwhile '\\n\\n' in processed_markdown:\n  processed_markdown = re.sub(r'\\n\\n', r'\\n', processed_markdown) \n  \nreturn {'document_id': _('Download Files').item.json.file_ids,'processed_markdown': processed_markdown, 'orginal_special_content': orginal_special_content}"
+      },
+      "id": "cc3ad539-d985-4f43-a5d2-13833a8e428a",
+      "name": "Markdown Preprocessing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "language": "python",
+        "pythonCode": "import re\nimport json\n\ndef split_document_by_headers(document, headers):\n  pattern = r\"(\" + \"|\".join(re.escape(header) for header in headers) + r\")\"\n  parts = re.split(pattern, document)\n  result = {}\n  current_header = None\n  for part in parts:\n    if part.strip() in headers:\n      current_header = part.strip()\n      result[current_header] = []\n    elif current_header:\n      lines = [line.strip() for line in part.split(\"\\n\") if line.strip()]\n      paragraphs = []\n      current_paragraph = []\n      for line in lines:\n        if line.startswith((\"-\", \"*\", \"+\")) and current_paragraph:\n          current_paragraph.append(\"\\n\" + line)\n        else:\n          if current_paragraph:\n            paragraphs.append(\" \".join(current_paragraph))\n          current_paragraph = [line]\n      if current_paragraph:\n        paragraphs.append(\" \".join(current_paragraph))\n      result[current_header].extend(paragraphs)\n  return result\n\nresult = []\nfor item in _('File Download Loop').all():\n  processed_markdown = item.json.processed_markdown\n  document_id = item.json.document_id\n  \n  headers = re.findall(r'^(#{1,6})\\s*(.*)', processed_markdown, re.MULTILINE)\n  header_list = [{'level': len(header[0]), 'title': header[1].strip()} for header in headers]\n  header_list_text = ['#'*header['level'] + ' ' + header['title'] for header in header_list]\n  \n  header_with_direct_content = split_document_by_headers(processed_markdown, header_list_text)\n  result.append({'document_id':document_id, 'header_list': header_list, 'header_with_direct_content': header_with_direct_content, 'processed_markdown': processed_markdown})\n\nreturn result"
+      },
+      "id": "4a9794d5-9d39-4ddf-9cf7-11198985407d",
+      "name": "Header Extraction",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "from py2neo import Graph, Node, Relationship\nfrom py2neo import NodeMatcher\n\ngraph = Graph(\"bolt://host.docker.internal:7687\", auth=(\"neo4j\", \"Trinq23062003\"))\n\ndef create_document_tree(document_id, header_list, header_with_direct_content):\n  heading_with_id = []\n  content_with_id = []\n\n  prev_node_by_level = {}\n  matcher = NodeMatcher(graph)\n  document_node = matcher.match(\"__Document__\", document_id=document_id).first()\n\n  if not document_node:\n    document_node = Node(\"__Document__\", document_id=document_id)\n    graph.create(document_node)\n\n  for h_index, header in enumerate(header_list):\n    level = header[\"level\"]\n    title = '#'*level + ' ' + header[\"title\"]\n    heading_id = document_id+'H_'+str(h_index)\n    heading_with_id.append({'heading_id': heading_id, 'title': title})\n    current_node = Node(\"__Heading__\", title=title, heading_id=heading_id)\n    graph.create(current_node)\n    doc_heading_rel = Relationship(current_node, \"__IS_A_HEADING_IN_DOCUMENT__\", document_node)\n    graph.create(doc_heading_rel)\n\n    if level - 1 in prev_node_by_level:\n      parent_node = prev_node_by_level[level - 1]\n      rel = Relationship(current_node, \"__IS_DIRECT_SUB_HEADING_OF__\", parent_node)\n      graph.create(rel)\n\n    if level in prev_node_by_level:\n      prev_node = prev_node_by_level[level]\n      next_rel = Relationship(current_node, \"__IS_NEXT_HEADING_OF__\", prev_node)\n      graph.create(next_rel)\n\n    prev_node_by_level[level] = current_node\n\n    if title in header_with_direct_content:\n      prev_content_node = None\n      content_list = header_with_direct_content[title]\n\n      for c_index, content in enumerate(content_list):\n        content_id = heading_id + 'C_'+str(c_index)\n        content_with_id.append({'content_id': content_id, 'content': content})\n        content_node = Node(\"__Content__\", content=content, content_id=content_id)\n        graph.create(content_node)\n\n        doc_content_rel = Relationship(content_node, \"__IS_A_CONTENT_IN_DOCUMENT__\", document_node)\n        graph.create(doc_content_rel)\n\n        has_direct_content_rel = Relationship(current_node, \"__HAS_DIRECT_CONTENT__\", content_node)\n        graph.create(has_direct_content_rel)\n\n        if prev_content_node:\n          is_next_content_of_rel = Relationship(content_node, \"__IS_NEXT_CONTENT_OF__\", prev_content_node)\n          graph.create(is_next_content_of_rel)\n\n        prev_content_node = content_node\n  \n  return {'heading_with_id': heading_with_id, 'content_with_id': content_with_id}\n\ndocument_layer_metadata = []\n\nfor item in items:\n  header_list = item['header_list']\n  header_with_direct_content = item['header_with_direct_content']\n  document_id = 'D_' + item['document_id']\n  document_tree_metadata = create_document_tree(document_id, header_list, header_with_direct_content)\n  document_layer_metadata.append({'document_id': document_id, 'document_tree_metadata': document_tree_metadata})\n\nreturn document_layer_metadata"
+      },
+      "id": "f4969031-8f76-41cb-b131-b75e89f6b4a7",
+      "name": "Document Tree Creation",
+      "type": "n8n-nodes-python.pythonFunction",
+      "typeVersion": 1,
+      "position": [
+        2060,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 2. Knowledge graph construction",
+        "height": 4904,
+        "width": 4822,
+        "color": 3
+      },
+      "id": "fd305e50-a9df-4203-bb18-c8f0f871c829",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        720,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 1. Environment Variables",
+        "height": 4903,
+        "width": 522,
+        "color": 3
+      },
+      "id": "97c3fe29-070f-40a7-a5e0-6615828a1f14",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        180,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### 2.1. Download and Preprocessing",
+        "height": 347.01830515569526,
+        "width": 1586.4148906809228,
+        "color": 2
+      },
+      "id": "aef2afc2-9d7c-4f1a-9f95-e0ed2662d281",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        740,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### 2.1. Creating Document Layer",
+        "height": 1525.6093741200011,
+        "width": 1586.4148906809228,
+        "color": 2
+      },
+      "id": "b97148fd-07c5-41e8-bd4f-f8fe357e4529",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        740,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### 2.2. Creating Entity Layer",
+        "height": 2518.1904810705096,
+        "width": 1586.0374817757215,
+        "color": 2
+      },
+      "id": "9b1ff288-d983-4fd5-b089-7c6e600cc080",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2340,
+        1100
+      ]
+    },
+    {
+      "parameters": {
+        "content": "#### 2.1.1. Creating Document Trees",
+        "height": 214.0489361981272,
+        "width": 1549.2327598997663,
+        "color": 7
+      },
+      "id": "50ea008f-e923-42e9-b336-4829178459e5",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        760,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "content": "#### 2.1.1. Creating Contextual Chunks",
+        "height": 563.9950298048459,
+        "width": 1549.2327598997663,
+        "color": 7
+      },
+      "id": "c5338bb3-312f-41c3-9c53-fcdf9978daf9",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        760,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "searchMethod": "query",
+        "queryString": "='1yihmbf-bxLfA1IqN-r7Fyn3vxBRJ_ZiB' in parents and mimeType='text/markdown'",
+        "returnAll": true,
+        "filter": {},
+        "options": {}
+      },
+      "id": "eca21f20-4d49-481a-b1be-36be0b79794a",
+      "name": "Get File Names",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        980,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('Set Files IDs').item.json.file_ids }}",
+          "mode": "id"
+        },
+        "options": {
+          "binaryPropertyName": "data"
+        }
+      },
+      "id": "27296faa-2d67-4463-a2dd-cdbbf1da3f07",
+      "name": "Download Files",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1720,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ab39fb04-14b9-488f-9e0c-ee719438ba4e",
+              "name": "file_ids",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5710db41-29c8-4c6f-93a8-32bb14a964c3",
+      "name": "Set Files IDs",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1180,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "from py2neo import Graph, Node, Relationship\n\ngraph = Graph(\"bolt://host.docker.internal:7687\", auth=(\"neo4j\", \"Trinq23062003\"))\ngraph.run(\"MATCH (n) DETACH DELETE n\")\n\nfor item in items:\n  document_id = item['document_id']\n  document_node = Node(\"__Document__\", document_id=\"D_\" + document_id)\n  graph.create(document_node)\n\nreturn [{'document_nodes_creation_status': 'success'}]"
+      },
+      "id": "fdbd0b76-e6bb-4177-91b4-5cc275f5234d",
+      "name": "Create Document Nodes",
+      "type": "n8n-nodes-python.pythonFunction",
+      "typeVersion": 1,
+      "position": [
+        860,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "863715c4-d55a-4d42-be57-4e76c12aed13",
+              "name": "document_id",
+              "value": "={{ $json.document_id }}",
+              "type": "string"
+            },
+            {
+              "id": "7a60a7fc-44b9-4881-a67f-de1aba8c69d4",
+              "name": "header_list",
+              "value": "={{ $json.header_list }}",
+              "type": "array"
+            },
+            {
+              "id": "f02fc578-4811-4820-82c4-7e180b84f84f",
+              "name": "header_with_direct_content",
+              "value": "={{ $json.header_with_direct_content }}",
+              "type": "object"
+            },
+            {
+              "id": "8bc48dfe-c6db-4ac7-916c-04bf7c56556c",
+              "name": "processed_markdown",
+              "value": "={{ $json.processed_markdown }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "79305fa6-70f4-40f1-9f15-ab1ed8e0deeb",
+      "name": "Set Fields for Document Tree Creation",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1740,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "content": "#### 2.1.2. Content Embedding with Qdrant",
+        "height": 647.6291625016697,
+        "width": 1549.2327598997663,
+        "color": 7
+      },
+      "id": "cf18130b-10e4-416b-ac3e-68430f910d43",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        760,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "separator": "||",
+        "chunkSize": 1024
+      },
+      "id": "79b12c0d-d683-47a8-899c-cc02a8bdf6ec",
+      "name": "Character Text Splitter",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        1740,
+        3820
+      ]
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $('Get Content With ID').item.json.content }}",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "content_id",
+                "value": "={{ $('Get Content With ID').item.json.content_id }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "a229aa2d-13f7-4f3a-a22d-c8d98f824d0b",
+      "name": "Content Data Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [
+        1160,
+        1260
+      ]
+    },
+    {
+      "parameters": {
+        "chunkSize": 512,
+        "chunkOverlap": 128,
+        "options": {}
+      },
+      "id": "7d33ce34-765a-44b2-9148-9a68610473ba",
+      "name": "Recursive Character Text Splitter",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        1280,
+        3840
+      ]
+    },
+    {
+      "parameters": {
+        "content": "#### 2.2.1. Entities and Relationships Extraction",
+        "height": 664.0052684126345,
+        "width": 1549.2327598997663,
+        "color": 7
+      },
+      "id": "67e5c08c-4da5-4be0-8c81-bea2af33357a",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2360,
+        1140
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d8bd11a1-088a-406b-9ffd-628e6a67afe4",
+              "name": "content_with_id",
+              "value": "={{ $json.document_tree_metadata.content_with_id }}",
+              "type": "array"
+            },
+            {
+              "id": "e34b6022-0fec-4bc9-807a-45e1fd8fda53",
+              "name": "glean",
+              "value": 2,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "afca74b0-a29a-45b3-b324-68b8d6c62cce",
+      "name": "Set Fields for ER Extraction",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2520,
+        1240
+      ]
+    },
+    {
+      "parameters": {
+        "content": "#### 2.2.2. Add Entities and Relationships to Knowledge Graph",
+        "height": 731.4333753840459,
+        "width": 1546.5538214037288,
+        "color": 7
+      },
+      "id": "9adc3dca-95a3-46d5-afef-03bbcf87b7e4",
+      "name": "Sticky Note9",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2360,
+        1820
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "from py2neo import Graph, Node, Relationship\n\ngraph = Graph(\"bolt://host.docker.internal:7687\", auth=(\"neo4j\", \"Trinq23062003\"))\n\ndef add_content_and_entities(data_list):\n  for data in data_list:\n    content_id = data[\"content_id\"]\n    content_node = graph.nodes.match(\"__Content__\", content_id=content_id).first()\n    if not content_node:\n      content_node = Node(\"__Content__\", content_id=content_id)\n      graph.create(content_node)\n\n    entity_nodes = {}\n\n    # Step 1: Add the __Entity__ nodes to the graph with unique entity_id\n    for entity_data in data[\"output\"][\"entities\"]:\n      entity_id = entity_data[\"entity_id\"]\n      entity_node = graph.nodes.match(\"__Entity__\", entity_id=entity_id).first()\n      if not entity_node:\n        entity_node = Node(\"__Entity__\",\n                           entity_id=entity_id,\n                           name=entity_data[\"name\"],\n                           definition=\"\",\n                           description=entity_data[\"description\"].replace(\"'\", \"\\\\'\"),\n                           name_emb = entity_data[\"name_emb\"][0],\n                           type=entity_data[\"type\"],\n                           source_content_ids=[content_id]\n                           )\n        graph.create(entity_node)\n\n      has_entity_relationship = Relationship(content_node, \"__HAS_ENTITY__\", entity_node)\n      graph.create(has_entity_relationship)\n      entity_nodes[entity_data[\"name\"]] = entity_node\n\n    # Step 2: Add relationships between __Entity__ nodes with unique relationship_id\n    for relationship_data in data[\"output\"][\"relationships\"]:\n      source_name = relationship_data[\"source\"]\n      target_name = relationship_data[\"target\"]\n      relationship_type = relationship_data[\"description\"]\n      relationship_strength = relationship_data[\"relationship_strength\"]\n\n      # Retrieve source and target nodes from the dictionary using their names\n      source_node = entity_nodes.get(source_name)\n      target_node = entity_nodes.get(target_name)\n\n      if source_node and target_node:\n        relationship_id = relationship_data[\"relationship_id\"]\n        entity_relationship = Relationship(\n          source_node, \"<<<\", target_node,\n          relationship_id=relationship_id,\n          description=relationship_type,\n          relationship_strength=relationship_strength\n        )\n        graph.create(entity_relationship)\n\nadd_content_and_entities(items)\nreturn [{'entity_nodes_creation_status': 'success'}]"
+      },
+      "id": "37b0a02c-5770-4d2b-ba8b-dcce4ac34c6a",
+      "name": "Add ER to Knowledge Graph",
+      "type": "n8n-nodes-python.pythonFunction",
+      "typeVersion": 1,
+      "position": [
+        3140,
+        1900
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### 2.3. Creating Community Layer",
+        "height": 1197.5067432430346,
+        "width": 1583.6719135834844,
+        "color": 2
+      },
+      "id": "52b5b4f3-dec8-4c78-95e3-1bd8579299a3",
+      "name": "Sticky Note11",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3940,
+        3240
+      ]
+    },
+    {
+      "parameters": {
+        "content": "#### 2.3.1. Community Detection",
+        "height": 379.6504142302002,
+        "width": 1542.724522085427,
+        "color": 7
+      },
+      "id": "f77fc251-e653-46ec-aab9-6602756e3231",
+      "name": "Sticky Note12",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3960,
+        3280
+      ]
+    },
+    {
+      "parameters": {
+        "content": "#### 2.3.2. Community Summarization",
+        "height": 741.3439527361744,
+        "width": 1544.554360584535,
+        "color": 7
+      },
+      "id": "21cd4595-1a3e-498a-aa8e-c034d23085be",
+      "name": "Sticky Note13",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3960,
+        3680
+      ]
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $('Entity Names Split Out').item.json.entity_name }}",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "entity_id",
+                "value": "={{ $('Entity Names Split Out').item.json.entity_id }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "61886220-7da7-4691-9e8d-e6e4bf063f48",
+      "name": "Entity Name Data Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [
+        3280,
+        2800
+      ]
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $('Entity Descriptions Split Out').item.json.entity_description }}",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "entity_id",
+                "value": "={{ $('Entity Descriptions Split Out').item.json.entity_id }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "46ad9616-6bb6-45d1-acf7-4c461ab72533",
+      "name": "Entity Description Data Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [
+        3280,
+        3140
+      ]
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $('Relationship Names Split Out').item.json.relationship_description }}",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "relationship_id",
+                "value": "={{ $('Relationship Names Split Out').item.json.relationship_id }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "adc979fb-d726-4eb0-861b-9bd1bf882793",
+      "name": "Relationship Description Data Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [
+        3280,
+        3440
+      ]
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $('Take List of Community Summary').item.json.community_summary }}",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "community_id",
+                "value": "={{ $('Take List of Community Summary').item.json.community_id }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "b2ce7905-839d-4519-9493-80970f85fb10",
+      "name": "Community Data Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [
+        4480,
+        4300
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "id": "5f839029-cb45-4cdf-b8a8-a9af6c4ed624",
+      "name": "File Download Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1400,
+        -120
+      ],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "let result = [];\n\nfor (const item in $input.all()) {\n  // content_with_id.flatMap(item => [item, item]);\n  // console.log(item.json.content_with_id);\n  let array_of_content = $input.all()[item].json.content_with_id;\n  result.push({'content_with_id': [].concat(...array_of_content.map(_item => Array($input.all()[item].json.glean).fill(_item)))});\n}\n\nreturn result;"
+      },
+      "id": "b9c9f589-a4cf-4ce1-ad37-c6a836e0a397",
+      "name": "Setup Glean Loop",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2780,
+        1240
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "options": {}
+      },
+      "id": "87f4d6a2-613c-41fa-ab67-110228af0c85",
+      "name": "GPT 35 Turbo Azure",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAzureOpenAi",
+      "typeVersion": 1,
+      "position": [
+        260,
+        2760
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"entities\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"name\": { \"type\": \"string\" },\n          \"type\": { \"type\": \"string\", \"enum\": [\"ORGANIZATION\", \"PERSON\", \"DATETIME\", \"NEURAL NETWORK\", \"PARAMETER\", \"DATA\", \"COMPUTER PROGRAM\", \"HARDWARE DEVICE\"] },\n          \"description\": { \"type\": \"string\" }\n        },\n        \"required\": [\"name\", \"type\", \"description\"]\n      }\n    },\n    \"relationships\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"source\": { \"type\": \"string\" },\n          \"target\": { \"type\": \"string\" },\n          \"description\": { \"type\": \"string\" },\n          \"relationship_strength\": { \"type\": \"integer\", \"minimum\": 1, \"maximum\": 10 }\n        },\n        \"required\": [\"source\", \"target\", \"relationship\", \"relationship_strength\"]\n      }\n    }\n  },\n  \"required\": [\"entities\", \"relationships\"]\n}\n"
+      },
+      "id": "2935dab3-d891-45bb-9eac-e3361c81360e",
+      "name": "ER Extractor Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        1980,
+        2160
+      ]
+    },
+    {
+      "parameters": {
+        "model": "llama-3.1-8b-instant",
+        "options": {}
+      },
+      "id": "f2a83f19-a7dd-440c-bdd9-c9db2f749b9d",
+      "name": "Groq Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        1940,
+        3340
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  'entities': [],\n  'relationships': []\n}"
+      },
+      "id": "4686a180-78b4-43d4-8fbb-05fbee829282",
+      "name": "ER Extraction Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3460,
+        1600
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "=content_with_id",
+        "options": {}
+      },
+      "id": "b7b8d77b-11b2-4a8d-9e02-4bf8997007cf",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        2640,
+        1460
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "e2311aba-3c14-40bb-8147-b5ae84b789bb",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        3600,
+        1480
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "b123f332-c2e7-494a-816c-c9685689ad2d",
+      "name": "ER Extraction Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        2920,
+        1460
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f61eee09-3ed3-4f02-b4bf-b02536eec9ef",
+              "name": "content_id",
+              "value": "={{ $('ER Extraction Loop').item.json.content_id }}",
+              "type": "string"
+            },
+            {
+              "id": "0c1b93d3-d1ea-4d1b-b611-042dbbd466b2",
+              "name": "output",
+              "value": "={{ $json.output }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e9c3b9d5-8d92-4168-9742-772e0bef69f6",
+      "name": "Assign Content ID",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3760,
+        1620
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Declare global counters for unique IDs\nlet entity_count = 1;\nlet relationship_count = 1;\n\nfunction mergeByContentId(arr) {\n  const merged = {};\n\n  arr.forEach((item) => {\n    const contentId = item.json.content_id;\n    if (item.json['output'] === null) return;\n\n    const entities = item.json['output']['entities'] || [];\n    const relationships = item.json['output']['relationships'] || [];\n\n    if (!merged[contentId]) {\n      merged[contentId] = {\n        content_id: contentId,\n        output: {\n          entities: [],\n          relationships: []\n        }\n      };\n    }\n    \n    entities.forEach(entity => {\n      entity.entity_id = `E_${entity_count++}`;\n    });\n\n    relationships.forEach(relationship => {\n      relationship.relationship_id = `R_${relationship_count++}`;\n    });\n\n    merged[contentId].output.entities.push(...entities);\n    merged[contentId].output.relationships.push(...relationships);\n  });\n\n  return Object.values(merged);\n}\n\nfunction mergeEntitiesInList(dataList) {\n  return dataList.map(data => {\n    const mergedEntities = [];\n    data.output.entities.forEach(entity => {\n      const existingEntity = mergedEntities.find(e => e.name === entity.name);\n\n      if (existingEntity) {\n        existingEntity.description += `; ${entity.description}`;\n      } else {\n        mergedEntities.push({ ...entity });\n      }\n    });\n\n    return {\n      ...data,\n      output: {\n        ...data.output,\n        entities: mergedEntities\n      }\n    };\n  });\n}\n\nconst mergedResult = mergeByContentId($input.all());\nconst refinedResult = mergeEntitiesInList(mergedResult);\nreturn refinedResult;\n"
+      },
+      "id": "99bbef4d-b6ba-4d82-9f5c-c3a5f0f9b442",
+      "name": "Group Proposed Entities by Content ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3140,
+        1220
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "entity_name",
+        "include": "selectedOtherFields",
+        "fieldsToInclude": "entity_id",
+        "options": {}
+      },
+      "id": "898de905-d75f-467a-9767-86d33fdb6140",
+      "name": "Entity Names Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        2880,
+        2620
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "entity_description",
+        "include": "selectedOtherFields",
+        "fieldsToInclude": "entity_id",
+        "options": {}
+      },
+      "id": "d76a0ab4-cf67-4244-9d36-8782f4b2783c",
+      "name": "Entity Descriptions Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        2880,
+        2960
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "relationship_description",
+        "include": "selectedOtherFields",
+        "fieldsToInclude": "relationship_id",
+        "options": {}
+      },
+      "id": "cbef5667-5438-457a-9669-3215d52da42d",
+      "name": "Relationship Names Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        2880,
+        3260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let heading_with_id_list = [];\n\nfor (const item of $input.all()) {\n  heading_with_id_list.push(...item.document_tree_metadata[\"content_with_id\"]);\n}\n\nreturn heading_with_id_list;"
+      },
+      "id": "d995d71e-c9f0-427b-9287-85ae54adba32",
+      "name": "Get Content With ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        860,
+        1120
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "from py2neo import Graph, Node, Relationship\n\ngraph = Graph(\"bolt://host.docker.internal:7687\", auth=(\"neo4j\", \"Trinq23062003\"))\n\nprojection_cypher_query = \"\"\"\n  CALL gds.graph.project(\n    'Entity_Clustering',\n    '__Entity__',\n    {\n      _ALL_: {\n        type: '*',\n        orientation: 'UNDIRECTED',\n        properties: {\n          weight: {\n            property: '*',\n            aggregation: 'COUNT'\n          }\n        }\n      }\n    }\n  )\n  YIELD graphName, nodeCount, relationshipCount;\n\"\"\"\ngraph.run(projection_cypher_query)\n\nclustering_cypher_query = \"\"\"\n  CALL gds.leiden.write(\n    'Entity_Clustering',\n    {\n      writeProperty: 'communities',\n      includeIntermediateCommunities: true,\n      relationshipWeightProperty: 'weight'\n    }\n  )\n  YIELD ranLevels, communityCount, modularity, modularities\n  RETURN ranLevels, communityCount, modularity, modularities;   \n\"\"\"\nresult = graph.run(clustering_cypher_query).data()\nranLevels = result[0][\"ranLevels\"]\ncommunityCount = result[0][\"communityCount\"]\nmodularity = result[0][\"modularity\"]\nmodularities = result[0][\"modularities\"]\n\ngraph.run(\"CALL gds.graph.drop('Entity_Clustering')\")\n\nreturn [{\n  'ranLevels': ranLevels,\n  'communityCount': communityCount,\n  'modularity': modularity,\n  'modularities': modularities\n}]"
+      },
+      "id": "b8f89a38-988e-457e-badf-66a39a1d8f64",
+      "name": "Entity Clustering",
+      "type": "n8n-nodes-python.pythonFunction",
+      "typeVersion": 1,
+      "position": [
+        4080,
+        3400
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "from py2neo import Graph, Node, Relationship, NodeMatcher, RelationshipMatcher\n\ngraph = Graph(\"bolt://host.docker.internal:7687\", auth=(\"neo4j\", \"Trinq23062003\"))\nnode_matcher = NodeMatcher(graph)\nrel_matcher = RelationshipMatcher(graph)\n\nquery_retrieve_entity_nodes = \"MATCH (n:__Entity__) RETURN n\"\n_entity_nodes = graph.run(query_retrieve_entity_nodes).data()\nentities = [entity_node['n'] for entity_node in _entity_nodes]\n\nfor entity in entities:\n  communities = entity.get('communities', [])\n  for index in range(len(communities)):\n    community_id = f\"{index}-{communities[index]}\"\n    if index == 0:\n      community_node = node_matcher.match(\"__Community__\", community_id=community_id).first()\n      if not community_node:\n        community_node = Node(\"__Community__\", community_id=community_id, level=index, rank=0)\n        graph.create(community_node)\n      else:\n        community_node[\"level\"] = index\n        graph.push(community_node)\n      \n      rel = rel_matcher.match((entity, community_node), r_type=\"__IN_COMMUNITY__\").first()\n      if not rel:\n        rel = Relationship(entity, \"__IN_COMMUNITY__\", community_node)\n        graph.create(rel)\n    else:\n      current_id = f\"{index}-{communities[index]}\"\n      previous_id = f\"{index - 1}-{communities[index - 1]}\"\n      \n      current_node = node_matcher.match(\"__Community__\", community_id=current_id).first()\n      if not current_node:\n        current_node = Node(\"__Community__\", community_id=current_id, level=index, rank=0)\n        graph.create(current_node)\n      else:\n        current_node[\"level\"] = index\n        graph.push(current_node)\n      previous_node = node_matcher.match(\"__Community__\", community_id=previous_id).first()\n      if not previous_node:\n        previous_node = Node(\"__Community__\", community_id=previous_id, level=index - 1)\n        graph.create(previous_node)\n      else:\n        previous_node[\"level\"] = index - 1\n        graph.push(previous_node)\n      rel_sub = rel_matcher.match((previous_node, current_node), r_type=\"__IS_DIRECT_SUB_COMMUNITY_OF__\").first()\n      if not rel_sub:\n        rel_sub = Relationship(previous_node, \"__IS_DIRECT_SUB_COMMUNITY_OF__\", current_node)\n        graph.create(rel_sub)\n\nleaf_community_id_rank_list = graph.run(\"\"\"\n  MATCH (leafCommunity:__Community__)<-[:__IN_COMMUNITY__]-(:__Entity__)<-[:__HAS_ENTITY__]-(d:__Content__)\n  WITH leafCommunity, count(distinct d) AS leafRank\n  RETURN leafCommunity.community_id AS community_id, leafRank\n\"\"\").data()\n\nfor community in leaf_community_id_rank_list:\n  community_id = community['community_id']\n  rank = community['leafRank']\n  c = node_matcher.match(\"__Community__\", community_id=community_id).first()\n  if c:\n    c['rank'] = rank\n    graph.push(c)\n\ncommunity_id_rank_list = graph.run(\"\"\"\n  MATCH (leafCommunity:__Community__)<-[:__IN_COMMUNITY__]-(:__Entity__)<-[:__HAS_ENTITY__]-(d:__Content__)\n  WITH leafCommunity, count(distinct d) AS leafRank\n  WITH leafCommunity, leafRank\n  MATCH (subCommunity:__Community__)<-[:__IS_DIRECT_SUB_COMMUNITY_OF__*]-(leafCommunity)\n  WITH subCommunity, sum(leafRank) AS subRank\n  RETURN subCommunity.community_id AS community_id, subRank\n\"\"\").data()\n\nfor community in community_id_rank_list:\n  community_id = community['community_id']\n  rank = community['subRank']\n  c = node_matcher.match(\"__Community__\", community_id=community_id).first()\n  if c:\n    c['rank'] = rank\n    graph.push(c)\n\n_community_nodes = graph.run(\"MATCH (n:__Community__) RETURN n\").data()\ncommunity_nodes = [community_node['n'] for community_node in _community_nodes]\nreturn community_nodes"
+      },
+      "id": "4ecb2c29-c256-4458-9594-28040a3b8b49",
+      "name": "Create Community Nodes",
+      "type": "n8n-nodes-python.pythonFunction",
+      "typeVersion": 1,
+      "position": [
+        4300,
+        3400
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "community_id",
+        "options": {}
+      },
+      "id": "82d3b965-7e80-417f-8f77-3f3591e2fc97",
+      "name": "Community ID Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        4520,
+        3400
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "from py2neo import Graph\n\ngraph = Graph(\"bolt://host.docker.internal:7687\", auth=(\"neo4j\", \"Trinq23062003\"))\n\nresults = []\n\nfor item in items:\n  community_id = item[\"community_id\"]\n  raw_community_info_retrieval_query = f\"\"\"\n    MATCH (c:`__Community__`)\n    WHERE c.community_id = '{community_id}'\n    WITH c\n    OPTIONAL MATCH (subCommunity:`__Community__`)-[:__IS_DIRECT_SUB_COMMUNITY_OF__*0..]->(c)\n    OPTIONAL MATCH (subCommunity)<-[:__IN_COMMUNITY__]-(e:__Entity__)\n    WITH c, collect(distinct e) AS nodes\n    WHERE size(nodes) > 1\n    CALL apoc.path.subgraphAll(nodes[0], {{\n      whitelistNodes:nodes\n    }})\n    YIELD relationships\n    RETURN c.community_id AS community_id,\n      [n in nodes | {{name: n.name, description: n.description, types: n.types}}] AS nodes,\n      [r in relationships | {{start: startNode(r).name, end: endNode(r).name, description: r.description}}] AS rels\n  \"\"\"\n\n  raw_community_info = graph.run(raw_community_info_retrieval_query).data()\n\n  if raw_community_info:\n    results.append(raw_community_info[0])\n\nreturn results\n"
+      },
+      "id": "da9c44f8-58c9-4e00-8e47-f7f1b58259c4",
+      "name": "Local Topo Retrieval For Community Node",
+      "type": "n8n-nodes-python.pythonFunction",
+      "typeVersion": 1,
+      "position": [
+        4740,
+        3400
+      ]
+    },
+    {
+      "parameters": {
+        "language": "python",
+        "pythonCode": "# # Loop over input items and add a new field called 'myNewField' to the JSON of each one\n# for item in _input.all():\n#   item.json.myNewField = 1\n# return _input.all()\ndef community_info_string_parsing(community_info) -> str:\n  nodes_str = \"List of nodes are:\\n\"\n  for id, node in enumerate(community_info['nodes']):\n    node_name = node['name']\n    if node['types']: node_type = \", \".join(node['types'])\n    else: node_type = \"Undefined type\"\n      \n    if 'description' in node and node['description']: node_description = f\", description: {node['description']}\"\n    else: node_description = \"\"\n      \n    nodes_str += f\"{id}. Name: {node_name}, types: {node_type}{node_description}\\n\"\n  rels_str = \"List of relationships are:\\n\"\n  for id, rel in enumerate(community_info['rels']):\n    rel_start = rel['start']\n    rel_end = rel['end']\n    rel_description = rel['description']\n    rels_str += f\"{id}. {rel_start} -> {rel_end}, description: {rel_description}\\n\"\n  community_info_str = f\"{nodes_str}\\n{rels_str}\"\n\n  return community_info_str.strip()\n\nresult = []\n\nfor item in _input.all():\n  community_info = item.json\n  community_info_str = community_info_string_parsing(community_info)\n  community_info_parsing_obj = {\n    'community_id': item.json['community_id'],\n    'community_info': community_info_str\n  }\n  result.append(community_info_parsing_obj)\n\nreturn result"
+      },
+      "id": "bc6e3b68-1068-480c-8df2-dfd1404bf063",
+      "name": "Topo Info Parsing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4960,
+        3400
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "173051bc-129b-4256-8944-6e23fc6dd7ae",
+      "name": "Community Summary Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        4060,
+        3880
+      ]
+    },
+    {
+      "parameters": {
+        "chunkingMode": "advanced",
+        "options": {
+          "summarizationMethodAndPrompts": {
+            "values": {
+              "prompt": "=INSTRUCTION:\n-Goal-\nBased on the provided nodes and relationships that belong to the same graph community, generate a natural language summary of the provided information in a clear and informative manner, ensuring that all key details are highlighted.\n-Steps-\n  1. Understand the Entity Nodes: Review all the entity nodes provided in the input context, ensuring you grasp their roles and significance within the graph community.\n  2. Understand the Relationships: Identify and comprehend the relationships between these entities, considering how they interact and influence each other.\n  3. Rearrange Relationships Logically: Organize the relationships so that related content is grouped together in a logical sequence. This will create a cohesive narrative flow when describing the connections.\n  4. Craft a Natural Language Summary: Use natural language to describe the relationships between the entities, ensuring that all relevant information is included and no details are omitted. Summarize the relationships in a way that maintains clarity and coherence.\n  5. Enhance the Description with Entity References: Refer to the entities in your summary to enhance the connection between the nodes and relationships. This will help form a well-rounded and complete description of the graph community while maintaining a smooth narrative.\n\nWrite a concise summary of the following:\n\n======\n\"{text}\"\n======\n\nCONCISE SUMMARY:"
+            }
+          }
+        }
+      },
+      "id": "7eaaeefc-cb87-48c6-a98f-64613288a6eb",
+      "name": "Summarization Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainSummarization",
+      "typeVersion": 2,
+      "position": [
+        4280,
+        4040
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3ce1d39d-e9c0-440a-9da4-29891ef6607d",
+              "name": "community_id",
+              "value": "={{ $('Community Summary Loop').item.json.community_id }}",
+              "type": "string"
+            },
+            {
+              "id": "7268f16a-2abc-4c9b-a457-f50b1d9768ae",
+              "name": "community_summary",
+              "value": "={{ $json.response.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "169e62ce-dc54-4afa-9256-e2835286a1b5",
+      "name": "Pair ID And Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4660,
+        4040
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all();"
+      },
+      "id": "d84ab0db-7360-466e-a839-17dc8424cd24",
+      "name": "Take List of Community Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4640,
+        3760
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "from py2neo import Graph, Node, Relationship, NodeMatcher, RelationshipMatcher\n\ngraph = Graph(\"bolt://host.docker.internal:7687\", auth=(\"neo4j\", \"Trinq23062003\"))\nnode_matcher = NodeMatcher(graph)\n\nfor item in items:\n  c = node_matcher.match(\"__Community__\", community_id=item['community_id']).first()\n  c['summary_content'] = item['community_summary']\n  graph.push(c)\n\nreturn [{'community_nodes_creation_status': 'success'}]"
+      },
+      "id": "3f69f25e-fded-4c62-9179-caa15a9d7ca3",
+      "name": "Add Community Summary",
+      "type": "n8n-nodes-python.pythonFunction",
+      "typeVersion": 1,
+      "position": [
+        5040,
+        3760
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch"
+      },
+      "id": "386c14ad-8801-4565-a5fe-f86c8f39c464",
+      "name": "Community Layer Branch Merger",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        5360,
+        4240
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "id": "592b97c5-205a-412a-8f8a-04aa2329a80a",
+      "name": "Indexing Phase Merger",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        5360,
+        4500
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "chunks",
+        "include": "selectedOtherFields",
+        "fieldsToInclude": "original_content",
+        "options": {
+          "destinationFieldName": "chunk"
+        }
+      },
+      "id": "93e2c8fb-4c5b-4b5a-800a-67f7c046f6cb",
+      "name": "Chunks To List",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "python",
+        "pythonCode": "texts = [f\"{_('Generate Contextual Text').item.json.text}\\n---\\n{_('Chunks To List').item.json.chunk}\"]\n\nfrom sklearn.feature_extraction.text import TfidfVectorizer\n\n# Create TF-IDF vectorizer\nvectorizer = TfidfVectorizer()\n\n# Fit and transform the texts to generate TF-IDF vectors\nX = vectorizer.fit_transform(texts)\n\nreturn {\n  \"sparse\": {\n    \"indices\": X.indices.tolist(),\n    \"values\": X.data.tolist()\n  }\n}"
+      },
+      "id": "8df555ff-5563-4988-9a7d-1bae58fd842c",
+      "name": "Generate TF-IDF Sparse Vectors",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        820
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const chunks = [];\nconst chunkSize = $('Chunk Params').all()[0].json.chunk_size;\nconst chunkOverlap = $('Chunk Params').all()[0].json.chunk_overlap;\n\nconst content_with_id_item = $('Document Tree Creation').item.json.document_tree_metadata['content_with_id'];\n\nfor (const content_with_id in content_with_id_item){\n  var content_id = content_with_id_item[content_with_id]['content_id']\n  var text = content_with_id_item[content_with_id]['content'];\n\n  for (let i=0,j=Math.round(text.length/chunkSize)+1;i<j;i++) {\n    chunks.push({\n        'content_id': content_id,\n        'chunk_id': content_id+'_CH_'+i,\n        'text': text.substr(Math.max(0,(i * chunkSize)-chunkOverlap), chunkSize),\n      }\n    );\n  }\n}\n\n\nreturn { 'chunks': chunks, 'original_content': $('Set Fields for Document Tree Creation').item.json.processed_markdown};"
+      },
+      "id": "8e6f94cb-bf17-4aff-a736-d4b8cde0fa9a",
+      "name": "Create Chunks From Doc",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4366f241-b593-4c2e-9497-06ab47d02eaf",
+              "name": "chunk_size",
+              "value": 1024,
+              "type": "number"
+            },
+            {
+              "id": "09bc9a39-a47b-45c0-b53f-a820c9e3caf0",
+              "name": "chunk_overlap",
+              "value": 128,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c81aebd4-d549-49ac-aada-eb30510cf8c3",
+      "name": "Chunk Params",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        260,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "069d067c-3534-4939-8ff4-34dee02a9436",
+              "name": "content_id",
+              "value": "={{ $('Chunks To List').item.json.chunk.content_id }}",
+              "type": "string"
+            },
+            {
+              "id": "24e01f4f-e156-47e9-a89e-9cbdccda6bd4",
+              "name": "contextual_chunk",
+              "value": "={{ $('Generate Contextual Text').item.json.text }}",
+              "type": "string"
+            },
+            {
+              "id": "5e396008-0e5e-49c2-9db9-97d7ef83a293",
+              "name": "original_chunk_id",
+              "value": "={{ $('Chunks To List').item.json.chunk.chunk_id }}",
+              "type": "string"
+            },
+            {
+              "id": "f945a9d6-4769-4ae3-8169-d1e6c8746efa",
+              "name": "sparse",
+              "value": "={{ $json.sparse }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "26cf735a-95b5-4665-99c2-a6bab30ba3b1",
+      "name": "Get Values for Contextual Nodes",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1320,
+        820
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "from py2neo import Graph, Node, Relationship, NodeMatcher\n\ngraph = Graph(\"bolt://host.docker.internal:7687\", auth=(\"neo4j\", \"Trinq23062003\"))\nmatcher = NodeMatcher(graph)\n\ndef add_contextual_chunks(objects):\n  for obj in objects:\n    content_id = obj['content_id']\n    contextual_chunk = obj['contextual_chunk']\n    original_chunk_id = obj['original_chunk_id']\n    content_node = matcher.match(\"__Content__\", content_id=content_id).first()\n    \n    if content_node:\n      chunk_node = Node(\"__Contextual_chunk__\",\n                        contextual_chunk_id=original_chunk_id,\n                        original_chunk_id=original_chunk_id,\n                        contextual_chunk=contextual_chunk)\n      graph.create(chunk_node)\n      is_a_chunk_of_rel = Relationship(chunk_node, \"__IS_A_CHUNK_OF__\", content_node)\n      graph.create(is_a_chunk_of_rel)\n      previous_chunk = graph.evaluate(\n        f\"\"\"\n        MATCH (c:__Content__ {{content_id: '{content_id}'}})\n        -[:__IS_A_CHUNK_OF__]->(chunk:__Contextual_chunk__)\n        RETURN chunk\n        ORDER BY chunk.contextual_chunk_id DESC\n        LIMIT 1\n        \"\"\"\n      )\n      if previous_chunk and previous_chunk['contextual_chunk_id'] != original_chunk_id:\n        is_next_chunk_rel = Relationship(previous_chunk, \"__IS_NEXT_CONTEXTUAL_CHUNK_OF__\", chunk_node)\n        graph.create(is_next_chunk_rel)\n\nobjects = []\nfor item in items:\n  objects.append({'content_id': item['content_id'], 'contextual_chunk': item['contextual_chunk'], 'original_chunk_id': item['original_chunk_id']})\n\nadd_contextual_chunks(objects)\n\nreturn [{'add_contextual_chunk_status': 'success'}]"
+      },
+      "id": "36ff3d96-daa7-421e-9614-5837a0d90b2c",
+      "name": "Add Contectual Chunk Nodes",
+      "type": "n8n-nodes-python.pythonFunction",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        820
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch",
+        "numberInputs": 4
+      },
+      "id": "126ebafe-0ef8-4299-a82a-a3ba6c9bcc22",
+      "name": "Document Layer Branch Merger",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        2140,
+        1220
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "entity_description_sublayer",
+          "mode": "list",
+          "cachedResultName": "entity_description_sublayer"
+        },
+        "options": {}
+      },
+      "id": "0ce633d3-4883-448b-b76f-aaf19c4435c0",
+      "name": "Entity Description Embedding",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1,
+      "position": [
+        3140,
+        2960
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "community_summary_layer",
+          "mode": "list",
+          "cachedResultName": "community_summary_layer"
+        },
+        "options": {}
+      },
+      "id": "7a0b6a11-d186-4b60-abd7-afeabdcbff7c",
+      "name": "Community Summary Embedding",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1,
+      "position": [
+        4900,
+        4260
+      ]
+    },
+    {
+      "parameters": {
+        "content": "#### 2.2.3. Entities and Relationships Resolution",
+        "height": 1044.0877528217693,
+        "width": 1546.4368720272387,
+        "color": 7
+      },
+      "id": "780f40e5-f292-4509-b5f7-e276f1f7e001",
+      "name": "Sticky Note10",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2360,
+        2560
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "from py2neo import Graph, Node, Relationship\ngraph = Graph(\"bolt://host.docker.internal:7687\", auth=(\"neo4j\", \"Trinq23062003\"))\n\ndef merge_entity_nodes_from_id_list(entity_node_ids: list[int]):\n  entity_nodes = []\n  for node_id in entity_node_ids:\n    result = graph.run(\n      f\"MATCH (n:__Entity__) WHERE id(n) = {node_id} RETURN n\"\n    ).data()\n    if result:\n      entity_nodes.append(result[0]['n'])\n    else:\n      raise ValueError(f\"Node with ID {node_id} not found\")\n\n  base_node = entity_nodes[0]\n\n  combined_definitions = [node['definition'] for node in entity_nodes]\n  combined_descriptions = [node['description'] for node in entity_nodes]\n  combined_types = set()\n  combined_source_content_ids = set()\n\n  for node in entity_nodes:\n    combined_types.update(node['type'])\n    combined_source_content_ids.update(node['source_content_ids'])\n\n  new_node = Node(\n    \"__Entity__\",\n    name=base_node['name'],\n    definition=\"\\n\\n\".join(combined_definitions),\n    description=\"\\n\\n\".join(combined_descriptions),\n    types=list(combined_types),\n    source_content_ids=list(combined_source_content_ids),\n    name_emb=base_node['name_emb'],\n  )\n\n  graph.create(new_node)\n  new_node_id = new_node.identity\n\n  merging_node_id = entity_node_ids[0]\n  for node_id in entity_node_ids[1:]:\n    if node_id == merging_node_id:\n      continue\n    cypher_merge_nodes = f\"\"\"\n    MATCH (n1:__Entity__), (n2:__Entity__)\n    WHERE id(n1) = {merging_node_id} AND id(n2) = {node_id}\n    CALL apoc.refactor.mergeNodes([n1, n2], {{properties: 'overwrite'}})\n    YIELD node\n    RETURN node        \n    \"\"\"\n    try:\n      graph.run(cypher_merge_nodes)\n      print(f\"Merged node {node_id} into the new node {merging_node_id}\")\n    except Exception as e:\n      print(f\"Error while merging node {node_id}: {e}\")\n      \n  cypher_update_merged_node_properties = f\"\"\"\n  MATCH (n1:__Entity__), (n2:__Entity__)\n  WHERE id(n1) = {merging_node_id} AND id(n2) = {new_node_id}\n  CALL apoc.refactor.mergeNodes([n1, n2], {{properties: 'overwrite'}})\n  YIELD node\n  RETURN node         \n  \"\"\"\n  graph.run(cypher_update_merged_node_properties)\n\n  return merging_node_id\n\ndef similarity_analysis(document_node, similarity_threshold: float = 0.95):\n  projection_cypher_query = f\"\"\"CALL gds.graph.project.cypher(\n    'Similar_Entity_Graph',\n    'MATCH (d:__Document__) \n     WHERE d.document_id = \"{document_node['document_id']}\"\n     MATCH (c:__Content__)-[:__IS_A_CONTENT_IN_DOCUMENT__]->(d)\n     MATCH (c)-[:__HAS_ENTITY__]->(e:__Entity__)\n     RETURN id(e) AS id, e.name_emb AS embedding',\n    'MATCH (e1:__Entity__)-[r]-(e2:__Entity__)\n     RETURN id(e1) AS source, id(e2) AS target, type(r) AS type'\n  );\n  \"\"\"\n  try:\n    graph.run(projection_cypher_query)\n  except Exception as e:\n    return False\n  \n  cypher_query_knn = \"\"\"\n  CALL gds.knn.mutate(\n    'Similar_Entity_Graph',  \n    {\n      nodeProperties: ['embedding'],         \n      mutateRelationshipType: 'SIMILAR',     \n      mutateProperty: 'score',               \n      similarityCutoff: 0.95\n    }\n  )\n  YIELD relationshipsWritten\n  RETURN relationshipsWritten\n  \"\"\"\n  graph.run(cypher_query_knn)\n\n  cypher_query_wcc = \"\"\"\n  CALL gds.wcc.write(\n    'Similar_Entity_Graph',\n    {\n      writeProperty: 'wcc',\n      relationshipTypes: ['SIMILAR']\n    }\n  )\n  YIELD nodePropertiesWritten, componentCount\n  RETURN nodePropertiesWritten, componentCount\n  \"\"\"\n  graph.run(cypher_query_wcc)\n\n  graph.run(\"CALL gds.graph.drop('Similar_Entity_Graph', false);\")\n  return True\n\ndef duplicate_candidates_detection(document_node, word_edit_distance: int = 2, prefix_length: int = 3):\n  detection_query = f\"\"\"\n  MATCH (d:__Document__ {{document_id: '{document_node['document_id']}'}})\n  MATCH (e:__Entity__)<-[:__HAS_ENTITY__]-(c:__Content__)-[:__IS_A_CONTENT_IN_DOCUMENT__]->(d)\n  WHERE size(e.name) > {prefix_length}\n  WITH e.wcc AS community, collect(e) AS nodes, count(*) AS count\n  WHERE count > 1\n  UNWIND nodes AS node\n  WITH DISTINCT\n  [n IN nodes WHERE apoc.text.distance(toLower(node.name), toLower(n.name)) < {word_edit_distance} | id(n)] AS intermediate_results\n  WHERE size(intermediate_results) > 1\n  WITH collect(intermediate_results) AS results\n  UNWIND range(0, size(results)-1, 1) AS index\n  WITH results, index, results[index] AS result\n  WITH apoc.coll.sort(reduce(acc = result, index2 IN range(0, size(results)-1, 1) |\n    CASE WHEN index <> index2 AND\n      size(apoc.coll.intersection(acc, results[index2])) > 0\n      THEN apoc.coll.union(acc, results[index2])\n      ELSE acc\n    END\n  )) AS combinedResult\n  WITH DISTINCT(combinedResult) AS combinedResult\n  WITH collect(combinedResult) AS allCombinedResults\n  UNWIND range(0, size(allCombinedResults)-1, 1) AS combinedResultIndex\n  WITH allCombinedResults[combinedResultIndex] AS combinedResult, combinedResultIndex, allCombinedResults\n  WHERE NOT any(x IN range(0, size(allCombinedResults)-1, 1)\n    WHERE x <> combinedResultIndex\n    AND apoc.coll.containsAll(allCombinedResults[x], combinedResult)\n  )\n  RETURN combinedResult\n  \"\"\"\n\n  duplicate_candidate = graph.run(detection_query).data()\n  return [res['combinedResult'] for res in duplicate_candidate]\n\ndef find_similar_entity_nodes_in_given_document_node(document_node, similarity_threshold: float=0.95, word_edit_distance: int = 2, prefix_length: int = 3):\n  status = similarity_analysis(document_node=document_node, similarity_threshold=similarity_threshold)\n  \n  if status:\n    duplicate_candidate = duplicate_candidates_detection(document_node=document_node, word_edit_distance=word_edit_distance, prefix_length=prefix_length)\n    return duplicate_candidate\n  else:\n    return []\n\ndef process_all_documents(similarity_threshold: float = 0.95, word_edit_distance: int = 2, prefix_length: int = 3):\n  new_merged_node_ids = []\n  document_nodes = graph.run(\"MATCH (d:__Document__) RETURN d\").data()\n  all_duplicate_candidates = []\n  for document_data in document_nodes:\n    document_node = document_data['d']\n    duplicate_candidates = find_similar_entity_nodes_in_given_document_node(\n      document_node=document_node,\n      similarity_threshold=similarity_threshold,\n      word_edit_distance=word_edit_distance,\n      prefix_length=prefix_length\n    )\n    all_duplicate_candidates.append(duplicate_candidates)\n\n  for document in all_duplicate_candidates:\n    for duplicate_candidates in document:\n      print(f\"Duplicate Candidates: {duplicate_candidates}\")\n      new_node_id = merge_entity_nodes_from_id_list(duplicate_candidates)\n      new_merged_node_ids.append(new_node_id)\n  \n  return new_merged_node_ids\n\nnew_merged_node_ids = process_all_documents(similarity_threshold = 0.95, word_edit_distance = 2, prefix_length = 3)\nmerged_entities_matching_query = \"\"\"\nMATCH (e:__Entity__)\nWHERE ID(e) IN $node_ids\nRETURN ID(e) AS id, e.description AS description\n\"\"\"\nresults = graph.run(merged_entities_matching_query, node_ids=new_merged_node_ids).data()\n\nhas_entity_relationship_merging_query = \"\"\"\nMATCH (c:__Content__)-[r:__HAS_ENTITY__]->(e:__Entity__)\nWITH c, e, count(r) as rel_count\nWHERE rel_count > 1\nMATCH (c)-[r:__HAS_ENTITY__]->(e)\nDELETE r\nMERGE (c)-[:__HAS_ENTITY__]->(e)\n\"\"\"\ngraph.run(has_entity_relationship_merging_query)\nreturn results"
+      },
+      "id": "2eaa89a9-a774-491a-b9bd-5566cb69cf81",
+      "name": "Entity Resolution Merging",
+      "type": "n8n-nodes-python.pythonFunction",
+      "typeVersion": 1,
+      "position": [
+        3640,
+        1900
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "from py2neo import Graph\n\ngraph = Graph(\"bolt://host.docker.internal:7687\", auth=(\"neo4j\", \"Trinq23062003\"))\n\nset_new_description_query = \"\"\"\nMATCH (e:__Entity__)\nWHERE ID(e) = $node_id\nSET e.description = $new_description\n\"\"\"\n\nfor item in items:\n  node_id = item['id']\n  new_description = item['description']\n  graph.run(set_new_description_query, node_id=node_id, new_description=new_description)\n\nreturn [{'entity_description_update': 'success'}]\n"
+      },
+      "id": "8b1d64d8-4b37-42cf-bc02-e327ea1f27d7",
+      "name": "Update Merged Entities's Description",
+      "type": "n8n-nodes-python.pythonFunction",
+      "typeVersion": 1,
+      "position": [
+        3640,
+        2120
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "87622336-b316-4b8f-9e08-0db21210777e",
+              "name": "id",
+              "value": "={{ $('Entity Resolution Merging').item.json.id }}",
+              "type": "number"
+            },
+            {
+              "id": "858cbd9d-39b4-47e2-8a96-d3304ceeb366",
+              "name": "description",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "28530450-4a00-4b15-b1d9-a785e174a0dc",
+      "name": "Group ID and New Description",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3140,
+        2120
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "from py2neo import Graph\ngraph = Graph(\"bolt://host.docker.internal:7687\", auth=(\"neo4j\", \"Trinq23062003\"))\n\nentity_query_fetch = \"MATCH (e:__Entity__) RETURN e ORDER BY id(e)\"\nrelationship_query_fetch = \"MATCH ()-[r:`<<<`]->() RETURN r ORDER BY id(r)\"\nentities = graph.run(entity_query_fetch).data()\nrelationships = graph.run(relationship_query_fetch).data()\n\n\nreturn [{'entities': [{'entity_id': entity['e']['entity_id'], 'entity_name': entity['e']['name'], 'entity_description': entity['e']['description']} for entity in entities],\n         'relationships': [{'relationship_id': relationship['r']['relationship_id'], 'relationship_description': relationship['r']['description']} for relationship in relationships]}]"
+      },
+      "id": "f78d09ca-7ab9-4e9e-9ca7-14d426cd7295",
+      "name": "Get Entities and Relationships",
+      "type": "n8n-nodes-python.pythonFunction",
+      "typeVersion": 1,
+      "position": [
+        2420,
+        3020
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<|begin_of_instruction|>\nYou are given a text of description. Your task is to rewrite this in a clear meaning and semantically coherent.\n<|end_of_instruction|>\nText: {{ $json.description }}\nOutput: ",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=Create responses that are directly derived from the provided context, without introducing external information. Focus on accurately extracting entities and relationships from the text. Ensure that the responses are semantically coherent, clear, and concise. Start directly with the main content in each response, omitting any introductory text."
+            }
+          ]
+        }
+      },
+      "id": "b8f9184a-2d02-46fa-89d0-e81ecfe4cb7b",
+      "name": "Update Merged Entities's Description1",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        2500,
+        2120
+      ]
+    },
+    {
+      "parameters": {
+        "code": {
+          "execute": {
+            "code": "const inputData = this.getInputData();\nconst embeddingsInput = await this.getInputConnectionData('ai_embedding', 0);\n\nasync function addEmbeddingVectorsToEntities(inputData) {\n  for (const content of inputData) {\n    const { entities } = content.json.output;\n    for (const entity of entities) {\n      const embedding = await embeddingsInput.embedDocuments([entity.name]);\n      entity.name_emb = embedding;\n    }\n  }\n  return inputData;\n}\n\nreturn addEmbeddingVectorsToEntities(inputData);\n"
+          }
+        },
+        "inputs": {
+          "input": [
+            {
+              "type": "ai_embedding",
+              "maxConnections": 1,
+              "required": true
+            },
+            {
+              "type": "main",
+              "maxConnections": 1,
+              "required": true
+            }
+          ]
+        },
+        "outputs": {
+          "output": [
+            {
+              "type": "main"
+            }
+          ]
+        }
+      },
+      "id": "853c6a4a-f089-4631-825c-bda6a5d533ad",
+      "name": "Get Entity Name Embedding",
+      "type": "@n8n/n8n-nodes-langchain.code",
+      "typeVersion": 1,
+      "position": [
+        2500,
+        1900
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "import numpy as np\nfrom py2neo import Graph\n\ngraph = Graph(\"bolt://host.docker.internal:7687\", auth=(\"neo4j\", \"Trinq23062003\"))\n\nsimilarity_threshold = 0.85\nlength_difference_threshold = 50\n\ndef calculate_cosine_similarity(vec1, vec2):\n  \"\"\"Calculate the cosine similarity between two vectors.\"\"\"\n  vec1 = np.array(vec1)\n  vec2 = np.array(vec2)\n  vec1 = vec1.flatten()\n  vec2 = vec2.flatten()\n    \n  dot_product = np.dot(vec1, vec2)\n  norm_a = np.linalg.norm(vec1)\n  norm_b = np.linalg.norm(vec2)\n  return dot_product / (norm_a * norm_b)\n\nprint(len(items))\nfor item in items:\n  try:\n    rel1 = item['duplicate_rels'][0]['json']\n    rel2 = item['duplicate_rels'][1]['json']\n  except Exception as e:\n    pass\n  sim = calculate_cosine_similarity(rel1['emb_description'][0], rel2['emb_description'][0])\n  len_diff = abs(rel1['length'] - rel2['length'])\n\n  if sim >= similarity_threshold and len_diff <= length_difference_threshold:\n    rel_id_to_be_deleted = rel1['id'] if len(rel1['description']) > len(rel2['description']) else rel2['id']\n    delete_query = f\"\"\"\n    MATCH ()-[r]->() WHERE r.relationship_id = '{rel_id_to_be_deleted}' DELETE r\n    \"\"\"\n    graph.run(delete_query)\n\nreturn [{'relationship_resolution_merging': 'success'}]\n"
+      },
+      "id": "8d718fef-bfb8-4c76-9385-bb3bd39535c9",
+      "name": "Relation Resolution Merging",
+      "type": "n8n-nodes-python.pythonFunction",
+      "typeVersion": 1,
+      "position": [
+        3640,
+        2360
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "from py2neo import Graph\n\ngraph = Graph(\"bolt://host.docker.internal:7687\", auth=(\"neo4j\", \"Trinq23062003\"))\n\nquery = \"\"\"\nMATCH (a:__Entity__)-[r:`<<<`]-(b:__Entity__)\nWHERE id(a) < id(b)\nWITH a, b, COLLECT({id: r.relationship_id, description: r.description}) AS rel_details\nWHERE size(rel_details) > 1\nRETURN COLLECT({\n  id1: id(a), \n  id2: id(b), \n  relations: rel_details\n}) AS grouped_relations\n\"\"\"\nresults = [relations['relations'] for relations in graph.run(query).data()[0]['grouped_relations']]\nflat_list = [item for sublist in results for item in sublist]\n\nreturn flat_list"
+      },
+      "id": "434abb21-9f8b-4100-a9e2-9916b2540f61",
+      "name": "Get Duplicate Relations",
+      "type": "n8n-nodes-python.pythonFunction",
+      "typeVersion": 1,
+      "position": [
+        2500,
+        2360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const groupedArray = [];\nconst arrayOfRels = $('Get Duplicate Relations').all();\n\nfor (let i = 0; i < arrayOfRels.length; i += 2) {\n  const group = [arrayOfRels[i], arrayOfRels[i + 1]];\n  groupedArray.push({'duplicate_rels': group});\n}\n\nreturn groupedArray;\n// return {arrayOfRels}\n"
+      },
+      "id": "b49dc420-ce66-473d-a889-a7df9f30d2b9",
+      "name": "Group Duplicate Relations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3300,
+        2360
+      ]
+    },
+    {
+      "parameters": {
+        "code": {
+          "execute": {
+            "code": "const inputData = this.getInputData();\nconst embeddingsInput = await this.getInputConnectionData('ai_embedding', 0);\n\nasync function groupSimilarRelations(inputData) {\n  for (const relation of inputData) {\n    try {\n      if (relation.json.description) {\n        const embedding = await embeddingsInput.embedDocuments([relation.json.description]);\n        relation.json.emb_description = embedding;\n        relation.json.length = relation.json.description.length;\n      }\n    } catch (error) {\n      console.log(error);\n    }\n  }\n  return inputData;\n}\nconst res = await groupSimilarRelations(inputData);\nreturn {'duplicate_relations_emb_status': 'success'};"
+          }
+        },
+        "inputs": {
+          "input": [
+            {
+              "type": "ai_embedding",
+              "maxConnections": 1,
+              "required": true
+            },
+            {
+              "type": "main",
+              "maxConnections": 1,
+              "required": true
+            }
+          ]
+        },
+        "outputs": {
+          "output": [
+            {
+              "type": "main"
+            }
+          ]
+        }
+      },
+      "id": "b7050d01-385f-4bf6-94c5-caa740e028d4",
+      "name": "Get Duplicate Relations's Description Embedding",
+      "type": "@n8n/n8n-nodes-langchain.code",
+      "typeVersion": 1,
+      "position": [
+        2820,
+        2360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $json.entities;"
+      },
+      "id": "56c7bb3c-bd3e-4c7e-a2ea-86e5c7f4f664",
+      "name": "Get Grained Entities",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        2780
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $json.relationships;"
+      },
+      "id": "7b70e0da-f055-4558-acc0-b52f7aafae1d",
+      "name": "Get Grained Relationships",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        3260
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "intfloat/e5-large-v2",
+        "options": {}
+      },
+      "id": "b94c8ff1-ba22-4293-9d66-35451cbb0a25",
+      "name": "Retrieval Embedding Model",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsHuggingFaceInference",
+      "typeVersion": 1,
+      "position": [
+        1620,
+        2900
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "intfloat/e5-large-v2",
+        "options": {}
+      },
+      "id": "6c5f19d7-2090-4bc9-bbd5-8553c5aa2daa",
+      "name": "STS Embedding Model",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsHuggingFaceInference",
+      "typeVersion": 1,
+      "position": [
+        1820,
+        2900
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "llmrails/ember-v1",
+        "options": {}
+      },
+      "id": "8259fc1c-ffed-498a-9d16-501ff8876284",
+      "name": "Pair Classification Embedding Model1",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsHuggingFaceInference",
+      "typeVersion": 1,
+      "position": [
+        1980,
+        2900
+      ]
+    },
+    {
+      "parameters": {
+        "model": "SciPhi/Triplex",
+        "options": {}
+      },
+      "id": "fe1e451a-67bf-4c68-a08c-58bada96c1f3",
+      "name": "Knowledge Graph Construction LLM",
+      "type": "@n8n/n8n-nodes-langchain.lmOpenHuggingFaceInference",
+      "typeVersion": 1,
+      "position": [
+        260,
+        2940
+      ]
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $('Get Values for Contextual Nodes').item.json.contextual_chunk }}",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "contextual_chunk_id",
+                "value": "={{ $('Get Values for Contextual Nodes').item.json.original_chunk_id }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "ce9a1301-05da-498b-b06e-1124621e71aa",
+      "name": "Contextual Chunk Data Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [
+        1640,
+        1600
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "contextual_chunk_sublayer",
+          "mode": "list",
+          "cachedResultName": "contextual_chunk_sublayer"
+        },
+        "options": {}
+      },
+      "id": "cdbf9dd8-85a2-47f5-8d46-ef76322c63c8",
+      "name": "Contextual Chunk Embedding",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1,
+      "position": [
+        1560,
+        1440
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "content_sublayer",
+          "mode": "list",
+          "cachedResultName": "content_sublayer"
+        },
+        "options": {}
+      },
+      "id": "32c9ac63-b03c-410f-a3df-d56b779e0f86",
+      "name": "Content Embedding",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1,
+      "position": [
+        1080,
+        1120
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<|begin_of_document|> \n{{ $json.original_content }}\n<|end_of_document|>\nHere is the chunk we want to situate within the whole document \n<|begin_of_chunk|> \n{{ $json.chunk.text }}\n<|end_of_chunk|> \nPlease give a short succinct context to situate this chunk within the overall document to improve search retrieval of the chunk. Make sure that you don't miss any information from the chunk. Answer only with the succinct context and nothing else.\n\nOutput:",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are a trusworthy helpful assistant with exceptional ability in entity and relationship extraction from a given text. The information in your response must rely only on the context, don't add any external information."
+            }
+          ]
+        }
+      },
+      "id": "cfc1d42a-5e36-4f65-97ac-a06dd9ed2f65",
+      "name": "Generate Contextual Text",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        1860,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch",
+        "numberInputs": 3
+      },
+      "id": "23cac91c-a9e6-4c31-a57a-db1a37f0b68b",
+      "name": "Entity Layer Branch Merger",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        3760,
+        3400
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "relationship_description_sublayer",
+          "mode": "list",
+          "cachedResultName": "relationship_description_sublayer"
+        },
+        "options": {}
+      },
+      "id": "b630f847-a528-455d-abda-65ea6257868a",
+      "name": "Relationship Description Embedding",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1,
+      "position": [
+        3140,
+        3260
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "entity_name_sublayer",
+          "mode": "list",
+          "cachedResultName": "entity_name_sublayer"
+        },
+        "options": {}
+      },
+      "id": "67e218dc-38bc-4e79-81fd-06fc4fdcbe9f",
+      "name": "Entity Name Embedding",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1,
+      "position": [
+        3140,
+        2620
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<|Goal|>\nGiven a text document that is potentially relevant to this activity and a list of entity types, identify all entities of those types from the text and all relationships among the identified entities.\n<|Goal|>\n\n<|Instruction|>\n1. Identify all entities. For each identified entity, extract the following information:\n- entity_name: Name of the entity, capitalized\n- entity_type: One of the following types: [\"ORGANIZATION\", \"PERSON\", \"DATETIME\", \"NEURAL NETWORK\", \"PARAMETER\", \"DATA\", \"COMPUTER PROGRAM\", \"HARDWARE DEVICE\"]\n- entity_description: Comprehensive description of the entity's attributes and activities\n\nFormat each entity output as a JSON entry with the following format:\n\n{\"name\": <entity name>, \"type\": <type>, \"description\": <entity description>}\n\n2. From the entities identified in step 1, identify all pairs of (source_entity, target_entity) that are *clearly related* to each other.\nFor each pair of related entities, extract the following information:\n- source_entity: name of the source entity, as identified in step 1\n- target_entity: name of the target entity, as identified in step 1\n- relationship_description: explanation as to why you think the source entity and the target entity are related to each other\n- relationship_strength: an integer score between 1 to 10, indicating the strength of the relationship between the source entity and target entity\n\nFormat each relationship as a JSON entry with the following format:\n\n{\"source\": <source_entity>, \"target\": <target_entity>, \"description\": <relationship_description>, \"relationship_strength\": <relationship_strength>}\n\n3. Return output in English as a single list of all JSON entities and relationships identified in steps 1 and 2.\n<|Instruction|>\n\n<|Example|>\nText: \"My name is Michale. Helloworld is the first program I have ever learned.\"\nOutput:\n{\n  \"entities\":[\n    {\"name\": \"Helloworld\", \"type\": \"COMPUTER PROGRAM\", \"description\": \"The first program learned by Michale.\"},\n    {\"name\": \"Michale\", \"type\": \"PERSON\", \"description\": \"The speaker, his name is Michale.\"}\n  ],\n  \"relationships\": [\n    {\"source\": \"Helloworld\", \"target\": \"Michale\", \"description\": \"Helloworld is the first program Michalehase ever learned.\", \"relationship_strength\": 10 }\n  ]\n}\n<|Example|>\n\n=========\nText: {{ $json.content }}\nOutput:",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are a trusworthy helpful assistant with exceptional ability in entity and relationship extraction from a given text.\n\nYour response is a JSON, without any additional text.\nThe information in your response must rely only on the context, don't add any external information."
+            }
+          ]
+        }
+      },
+      "id": "2f5f952d-6128-4ebf-997c-207c5b9a2692",
+      "name": "ER Extractor",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        3140,
+        1480
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Chunk Params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Markdown Preprocessing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Markdown Preprocessing": {
+      "main": [
+        [
+          {
+            "node": "File Download Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Header Extraction": {
+      "main": [
+        [
+          {
+            "node": "Set Fields for Document Tree Creation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get File Names": {
+      "main": [
+        [
+          {
+            "node": "Set Files IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Files": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Files IDs": {
+      "main": [
+        [
+          {
+            "node": "File Download Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Document Nodes": {
+      "main": [
+        [
+          {
+            "node": "Header Extraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Fields for Document Tree Creation": {
+      "main": [
+        [
+          {
+            "node": "Document Tree Creation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Entity Name Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          },
+          {
+            "node": "Entity Description Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          },
+          {
+            "node": "Relationship Description Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          },
+          {
+            "node": "Contextual Chunk Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Content Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Content Embedding",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Content Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          },
+          {
+            "node": "Summarization Chain",
+            "type": "ai_textSplitter",
+            "index": 0
+          },
+          {
+            "node": "Community Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entity Name Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Entity Name Embedding",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entity Description Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Entity Description Embedding",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Relationship Description Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Relationship Description Embedding",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Community Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Community Summary Embedding",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File Download Loop": {
+      "main": [
+        [
+          {
+            "node": "Create Document Nodes",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Fields for ER Extraction": {
+      "main": [
+        [
+          {
+            "node": "Setup Glean Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Setup Glean Loop": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ER Extractor Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "ER Extractor",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ER Extraction Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "ER Extraction Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Assign Content ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ER Extraction Loop": {
+      "main": [
+        [
+          {
+            "node": "Group Proposed Entities by Content ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ER Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assign Content ID": {
+      "main": [
+        [
+          {
+            "node": "ER Extraction Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Group Proposed Entities by Content ID": {
+      "main": [
+        [
+          {
+            "node": "Get Entity Name Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add ER to Knowledge Graph": {
+      "main": [
+        [
+          {
+            "node": "Entity Resolution Merging",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Relationship Names Split Out": {
+      "main": [
+        [
+          {
+            "node": "Relationship Description Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Content With ID": {
+      "main": [
+        [
+          {
+            "node": "Content Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entity Names Split Out": {
+      "main": [
+        [
+          {
+            "node": "Entity Name Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entity Descriptions Split Out": {
+      "main": [
+        [
+          {
+            "node": "Entity Description Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entity Clustering": {
+      "main": [
+        [
+          {
+            "node": "Create Community Nodes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Community Nodes": {
+      "main": [
+        [
+          {
+            "node": "Community ID Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Community ID Split Out": {
+      "main": [
+        [
+          {
+            "node": "Local Topo Retrieval For Community Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Local Topo Retrieval For Community Node": {
+      "main": [
+        [
+          {
+            "node": "Topo Info Parsing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Community Summary Loop": {
+      "main": [
+        [
+          {
+            "node": "Take List of Community Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Summarization Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Topo Info Parsing": {
+      "main": [
+        [
+          {
+            "node": "Community Summary Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarization Chain": {
+      "main": [
+        [
+          {
+            "node": "Pair ID And Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pair ID And Summary": {
+      "main": [
+        [
+          {
+            "node": "Community Summary Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Take List of Community Summary": {
+      "main": [
+        [
+          {
+            "node": "Add Community Summary",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Community Summary Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Community Summary": {
+      "main": [
+        [
+          {
+            "node": "Community Layer Branch Merger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate TF-IDF Sparse Vectors": {
+      "main": [
+        [
+          {
+            "node": "Get Values for Contextual Nodes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Chunks From Doc": {
+      "main": [
+        [
+          {
+            "node": "Chunks To List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Document Tree Creation": {
+      "main": [
+        [
+          {
+            "node": "Create Chunks From Doc",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Content With ID",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Document Layer Branch Merger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chunk Params": {
+      "main": [
+        [
+          {
+            "node": "Get File Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chunks To List": {
+      "main": [
+        [
+          {
+            "node": "Generate Contextual Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Values for Contextual Nodes": {
+      "main": [
+        [
+          {
+            "node": "Add Contectual Chunk Nodes",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Contextual Chunk Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Contectual Chunk Nodes": {
+      "main": [
+        [
+          {
+            "node": "Document Layer Branch Merger",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Document Layer Branch Merger": {
+      "main": [
+        [
+          {
+            "node": "Set Fields for ER Extraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Community Summary Embedding": {
+      "main": [
+        [
+          {
+            "node": "Community Layer Branch Merger",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Entity Description Embedding": {
+      "main": [
+        [
+          {
+            "node": "Entity Layer Branch Merger",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Entity Resolution Merging": {
+      "main": [
+        [
+          {
+            "node": "Update Merged Entities's Description1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Group ID and New Description": {
+      "main": [
+        [
+          {
+            "node": "Update Merged Entities's Description",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Entities and Relationships": {
+      "main": [
+        [
+          {
+            "node": "Get Grained Entities",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Grained Relationships",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Merged Entities's Description1": {
+      "main": [
+        [
+          {
+            "node": "Group ID and New Description",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Entity Name Embedding": {
+      "main": [
+        [
+          {
+            "node": "Add ER to Knowledge Graph",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Relation Resolution Merging": {
+      "main": [
+        [
+          {
+            "node": "Get Entities and Relationships",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Duplicate Relations": {
+      "main": [
+        [
+          {
+            "node": "Get Duplicate Relations's Description Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Group Duplicate Relations": {
+      "main": [
+        [
+          {
+            "node": "Relation Resolution Merging",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Merged Entities's Description": {
+      "main": [
+        [
+          {
+            "node": "Get Duplicate Relations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Duplicate Relations's Description Embedding": {
+      "main": [
+        [
+          {
+            "node": "Group Duplicate Relations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Grained Entities": {
+      "main": [
+        [
+          {
+            "node": "Entity Names Split Out",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Entity Descriptions Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Grained Relationships": {
+      "main": [
+        [
+          {
+            "node": "Relationship Names Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieval Embedding Model": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Content Embedding",
+            "type": "ai_embedding",
+            "index": 0
+          },
+          {
+            "node": "Entity Description Embedding",
+            "type": "ai_embedding",
+            "index": 0
+          },
+          {
+            "node": "Relationship Description Embedding",
+            "type": "ai_embedding",
+            "index": 0
+          },
+          {
+            "node": "Entity Name Embedding",
+            "type": "ai_embedding",
+            "index": 0
+          },
+          {
+            "node": "Community Summary Embedding",
+            "type": "ai_embedding",
+            "index": 0
+          },
+          {
+            "node": "Contextual Chunk Embedding",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pair Classification Embedding Model1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Get Entity Name Embedding",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "STS Embedding Model": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Get Duplicate Relations's Description Embedding",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contextual Chunk Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Contextual Chunk Embedding",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contextual Chunk Embedding": {
+      "main": [
+        [
+          {
+            "node": "Document Layer Branch Merger",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Content Embedding": {
+      "main": [
+        [
+          {
+            "node": "Document Layer Branch Merger",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "ER Extractor",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Update Merged Entities's Description1",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Summarization Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Generate Contextual Text",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Contextual Text": {
+      "main": [
+        [
+          {
+            "node": "Generate TF-IDF Sparse Vectors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entity Layer Branch Merger": {
+      "main": [
+        [
+          {
+            "node": "Entity Clustering",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Relationship Description Embedding": {
+      "main": [
+        [
+          {
+            "node": "Entity Layer Branch Merger",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Entity Name Embedding": {
+      "main": [
+        [
+          {
+            "node": "Entity Layer Branch Merger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ER Extractor": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ER Extraction Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "cb87f49b-f007-47b2-b413-58de80a597b1",
+  "meta": {
+    "instanceId": "86431e8481febfe69a6ca3d9ea0e47205d7f5ca8cff8f316f5b0e37aeb4efc92"
+  },
+  "id": "IAkbaK1SGUu3F10k",
+  "tags": [
+    {
+      "createdAt": "2025-01-08T06:47:27.118Z",
+      "updatedAt": "2025-01-08T06:47:27.118Z",
+      "id": "JJDh7qq0y5cLH8Zd",
+      "name": "BKAI"
+    },
+    {
+      "createdAt": "2025-01-08T06:47:19.976Z",
+      "updatedAt": "2025-01-08T06:47:19.976Z",
+      "id": "KFkhFVeWjYqYM89f",
+      "name": "VTNET"
+    },
+    {
+      "createdAt": "2025-01-08T06:47:33.859Z",
+      "updatedAt": "2025-01-08T06:47:33.859Z",
+      "id": "VMS6pd69SZZtFRY4",
+      "name": "ORBIT"
+    }
+  ]
+}
