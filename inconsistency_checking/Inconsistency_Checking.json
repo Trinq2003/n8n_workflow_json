@@ -1,0 +1,1108 @@
+{
+  "name": "Inconsistency Checking",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.207.163.17:80/api/v1/retrieval",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "question",
+              "value": "={{ $json.chatInput }}"
+            },
+            {
+              "name": "dataset_ids",
+              "value": "={{ ['072af22e103811f08af30242c0a8b006'] }}"
+            },
+            {
+              "name": "similarity_threshold",
+              "value": "0.2"
+            },
+            {
+              "name": "vector_similarity_weight",
+              "value": "0.5"
+            },
+            {
+              "name": "top_k",
+              "value": "10"
+            },
+            {
+              "name": "page_size",
+              "value": "5"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e65e2931-3ffe-4a41-9a03-983d3e8bf524",
+      "name": "Retrieve From RAGFlow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        420
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "5IkKu0p5TGaZtLv7",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "var related_chunks = [];\nfor (let i=0; i<$input.all().length; i++) {\n  if ($input.all()[i].json.text === \"related\") {\n    chunk = $('Retrieve From RAGFlow').all()[0].json.data.chunks[i];\n    related_chunks.push(\n      {\n        'dataset_id': chunk.dataset_id,\n        'document_id': chunk.document_id,\n        'chunk_id': chunk.id,\n        'keywords': chunk.important_keywords,\n        'content': chunk.content\n      }\n    );\n  } \n}\n\nreturn related_chunks;"
+      },
+      "id": "3c180a6f-ca44-4f5a-ae7a-a8d8e4b4e3f0",
+      "name": "Filter Retrieved Chunks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1640,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"question\": {\n        \"type\": \"string\"\n      },\n      \"reason\": {\n        \"type\": \"string\"\n      }\n    },\n    \"required\": [\"question\", \"reason\"],\n    \"additionalProperties\": false\n  }\n}"
+      },
+      "id": "608c6a3f-7fdd-4cbe-a246-f2c04b06fe76",
+      "name": "Potential Conflicts",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        860,
+        940
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "3a9e75b9-480f-4206-8cef-4af6fd37e531",
+      "name": "User Query",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        820,
+        420
+      ],
+      "webhookId": "b1510c34-4ea0-4d44-9d56-9db6377116fa"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<proposal_law>\n{{ $('User Query').first().json.chatInput }}\n</proposal_llaw>\n\n<relevant_context>\n{{ $json.relevant_context }}\n</relevant_context>",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=Imagine that you are an expert in law inconsistency checking. You are given a proposal law and relevant context (the past official laws), which are both in Vietnamese. Your task is to generate 5 potential conflicts in the form of questions to the given proposal law. Please think step by step.\n\n<output>\nOutput in JSON format, specified as follows:\n```json\n[{\n  \"question\": # Your questions to indicate the potential conflicts in Vietnamese,\n  \"reason\": # The reason why this question may cause conflicts in Vietnamese, step by step and be as concise as possible.\n}]\n```\n</output>"
+            }
+          ]
+        }
+      },
+      "id": "0ebbe20c-c168-4c9c-92a6-8f36dd52b85e",
+      "name": "CoT Potential Conflicts Generation",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        800,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "numberOfItems": 5,
+          "separator": "\\n"
+        }
+      },
+      "id": "0c43ace1-a5af-45f3-b941-a0823398adf4",
+      "name": "Retrieval Decide",
+      "type": "@n8n/n8n-nodes-langchain.outputParserItemList",
+      "typeVersion": 1,
+      "position": [
+        1460,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<proposal_law>\n{{ $json.proposal_law }}\n</proposal_law>\n\n<question>\n{{ $json.question }}\n</question>\n\n<reason>\n{{ $json.reason }}\n</reason>\n\n<question_feedback>\n{{ $json.question_feedback }}\n</question_feedback>\n\n<reason_feedback>\n{{ $json.reason_feedback }}\n</reason_feedback>",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=As an expert in Vietnamese linguistic and excel lawyer, you have an excellent ability in Vietnamese laws understanding and inconsistency checking.\n<instruction>\n1. You are given items as follow:\n- A proposal law: A law which is under consideration for any conflict with official laws\n- A conflict question: A question to raise some problems, which may lead to potential conflicts between the proposal law and the official laws\n- A reason: A reason behind the conflict question\n- A question feedback: A feedback to the conflict question\n- A reason feedback: A feedback to the reason\n2. Your task is to rewrite the conflict question and the reason (in Vietnamese) based on the feedback, the proposed law. DO NOT make thing up.\n<\\intruction>"
+            }
+          ]
+        }
+      },
+      "id": "aaa0a393-2aeb-4306-9ee6-189f538c6ac1",
+      "name": "Refine 1",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        2120,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<proposal_law>\n{{ $json.proposal_law }}\n</proposal_law>\n\n<question>\n{{ $json.question }}\n</question>\n\n<reason>\n{{ $json.reason }}\n</reason>",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=As a legal expert and commentator on Vietnamese laws, your role is to provide constructive feedback on proposed legislation. \n\n<instruction>\n1. You are given a proposal law, a question to raise potential conflicts caused by the proposed law, and possible reasons that can lead to the conflicts.\n2. Your task involves analyzing proposed law to give feedback to the question that highlights potential conflicts, and the reasons behind those conflicts. You can consult the below criteria:\n- Relevant: Ensure the question and reasons are directly related to the proposed law and its context.\n- Informative: The question and reasons should reflect real and logical conflicts within the relevant legal framework.\n- Consistency: Avoid introducing new concepts or ideas that are not present in the proposal or relevant laws.\n- Specificity: Focus on concrete issues rather than abstract concepts, addressing the main points directly.\n3. For each feedback, recommend the way to improve the question (or the reason) to maximize the criteria.\n</instruction>\n\n<output>\nGo directly to the feedback without any introduction. Be as detailed as possible. Response in JSON format, of the following form:\n```json\n{\n  'question_feedback': # Your unified feedback, and recommendation for improvement for question written in Vietnamese,\n  'reason_feedback': # Your unified feedback, and recommendation for improvement for the reason written in Vietnamese\n}\n```\n</output>"
+            }
+          ]
+        }
+      },
+      "id": "dc7ee8d3-59f6-4ffa-9af1-3d5b05534654",
+      "name": "Feedback 1",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        1560,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<query>\n{{ $('User Query').item.json.chatInput }}\n</query>\n\n<context>\n{{ $json.data.chunks.slice(0, 5).map(item => \"- \" + item.content + \"\\n\") }}\n</context>",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=As an expert Vietnamese lawyer, your task is to determine which law applies to a specific query. You need to ensure that the laws you consider are consistent.\n<instruction>\nYou will be provided with a query and a list of five relevant contexts (all written in Vietnamese). Carefully read through each context and decide whether it is directly relevant to the query.\n</instruction>\n<output>\nYour output should indicate \"related\" or \"unrelated\" for each context, with each response on a separate line.\n</output>\n"
+            },
+            {
+              "type": "HumanMessagePromptTemplate",
+              "message": "=<query>\nTrường hợp ngang nhau thì bên có ý kiến của Chủ tịch Hội sẽ được chấp thuận. 3. Ban Chấp hành có nhiệm vụ và quyền hạn sau đây: a) Quyết định các biện pháp thực hiện nghị quyết, chương trình hoạt động trong nhiệm kỳ của Đại hội; b) Quyết định chương trình, kế hoạch công tác hàng năm hoặc giữa các kỳ họp của Ban Chấp hành; c) Thông qua kế hoạch và quyết toán tài chính nhiệm kỳ và hàng năm của Hội;\n</query>\n\n<context>\n- V. Hồ sơ, gồm: Điều 14. Ban Chấp hành Hội (hoặc tên gọi khác) 3. Nguyên tắc hoạt động của Ban Chấp hành: d) Các nghị quyết, quyết định của Ban Chấp hành được thông qua khi có trên ... tổng số ủy viên Ban Chấp hành dự họp biểu quyết tán thành. Trong trường hợp số ý kiến tán thành và không tán thành ngang nhau thì quyết định thuộc về bên có ý kiến của Chủ tịch Hội. Điều 15. Ban Thường vụ Hội (hoặc tên gọi khác) 1. Ban Thường vụ Hội do Ban Chấp hành bầu trong số các ủy viên Ban Chấp hành; Ban Thường vụ Hội gồm: Chủ tịch, các Phó Chủ tịch và các ủy viên. Số lượng, cơ cấu, tiêu chuẩn ủy viên Ban Thường vụ do Ban Chấp hành quyết định. Nhiệm kỳ của Ban Thường vụ cùng với nhiệm kỳ Đại hội. 2. Nhiệm vụ và quyền hạn của Ban Thuờng vụ:\n- Điều 13. Ban Chấp hành Trung ương Hội 2. Ban Chấp hành hoạt động theo Quy chế và Điều lệ Hội. Ban Chấp hành họp thường kỳ mỗi năm một lần; khi cần thiết có thể họp bất thường. Các quyết định, nghị quyết của Ban Chấp hành được thông qua và có hiệu lực khi có trên 50% tổng số ủy viên chính thức dự họp tán thành. Trường hợp ngang nhau thì bên có ý kiến của Chủ tịch Hội sẽ được chấp thuận. 3. Ban Chấp hành có nhiệm vụ và quyền hạn sau đây: a) Quyết định các biện pháp thực hiện nghị quyết, chương trình hoạt động trong nhiệm kỳ của Đại hội; b) Quyết định chương trình, kế hoạch công tác hàng năm hoặc giữa các kỳ họp của Ban Chấp hành; c) Thông qua kế hoạch và quyết toán tài chính nhiệm kỳ và hàng năm của Hội;\n- Điều 14. Ban Chấp hành Hội 4. Nguyên tắc hoạt động của Ban Chấp hành: d) Các nghị quyết, quyết định của Ban Chấp hành được thông qua khi có trên 1/2 (một phần hai) tổng số ủy viên Ban Chấp hành tham gia dự họp biểu quyết tán thành. Trường hợp số ý kiến tán thành và không tán thành ngang nhau thì quyết định thuộc về bên có ý kiến của Chủ tịch Hội. Điều 15. Ban Thường vụ Hội 1. Ban Thường vụ Hội do Ban Chấp hành bầu trong số các ủy viên Ban Chấp hành; Ban Thường vụ Hội gồm: Chủ tịch, các Phó Chủ tịch, Tổng thư ký và các ủy viên. Số lượng, cơ cấu, tiêu chuẩn ủy viên Ban Thường vụ do Ban Chấp hành Hội quyết định. Nhiệm kỳ của Ban Thường vụ cùng với nhiệm kỳ Đại hội. 2. Nhiệm vụ, quyền hạn của Ban Thường vụ:\n- V. Hồ sơ, gồm: Điều 14. Ban Chấp hành Hội (hoặc tên gọi khác) 3. Nguyên tắc hoạt động của Ban Chấp hành: d) Các nghị quyết, quyết định của Ban Chấp hành được thông qua khi có trên ... tổng số ủy viên Ban Chấp hành dự họp biểu quyết tán thành. Trong trường hợp số ý kiến tán thành và không tán thành ngang nhau thi quyết định thuộc về bên có ý kiến của Chủ tịch Hội. Điều 15. Ban Thường vụ Hội (hoặc tên gọi khác) 1- Ban Thường vụ Hội do Ban Chấp hành bầu trong số các ủy viên Ban Chấp hành; Ban Thường vụ Hội gồm: Chủ tịch, các Phó Chủ tịch và các ủy viên, số lượng, cơ cấu, tiêu chuẩn ủy viên Ban Thường vụ do Ban Chấp hành quyết định. Nhiệm kỳ của Ban Thường vụ cùng với nhiệm kỳ Đại hội. 2. Nhiệm vụ và quyền hạn của Ban Thường vụ:\n- Điều 14. Ban Chấp hành Hội 4. Nguyên tắc hoạt động của Ban Chấp hành: b) Các cuộc họp của Ban Chấp hành được xem là hợp lệ khi có 2/3 (hai phần ba) số lượng ủy viên Ban Chấp hành tham gia dự họp. Ban Chấp hành biểu quyết theo nguyên tắc quá bán, thiểu số phục tùng đa số. Trong trường hợp biểu quyết ngang nhau thì quyết định thuộc về bên có ý kiến của Chủ tịch Hội hoặc người chủ trì hội nghị. Ban Chấp hành có thể biểu quyết bằng hình thức giơ tay hoặc bỏ phiếu kín. Việc quy định hình thức biểu quyết họp Ban Chấp hành do Ban Chấp hành Hội quyết định; c) Giữa hai kỳ họp Ban Chấp hành để quyết định các vấn đề thuộc thẩm quyền của Ban Chấp hành có thể hội ý, thảo luận, thông qua lấy ý kiến bằng văn bản;\n</context>"
+            },
+            {
+              "type": "AIMessagePromptTemplate",
+              "message": "=related\nunrelated\nrelated\nrelated\nunrelated"
+            }
+          ]
+        }
+      },
+      "id": "b2c543c9-9036-4ef9-a222-10577f75b253",
+      "name": "Decide Relevant Content",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        1260,
+        420
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "fb3e9f8c-a7a0-472b-b397-0b1044e8e229",
+      "name": "Self-Consistency",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        4020,
+        1340
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        4020,
+        1620
+      ],
+      "id": "99e85701-0702-4d6c-afd5-b24e232fc89b",
+      "name": "OpenAI Chat Model"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "Qwen/Qwen2.5-32B-Instruct",
+          "mode": "list",
+          "cachedResultName": "Qwen/Qwen2.5-32B-Instruct"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1040,
+        960
+      ],
+      "id": "54b4b154-32b4-4518-93b0-5e50adb2cac7",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "aWaYU4wiYJ60xKFJ",
+          "name": "vLLM account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "Qwen/Qwen2.5-32B-Instruct",
+          "mode": "list",
+          "cachedResultName": "Qwen/Qwen2.5-32B-Instruct"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1920,
+        1220
+      ],
+      "id": "5f080263-e6dd-4937-9dfa-00e570946a42",
+      "name": "OpenAI Chat Model2",
+      "credentials": {
+        "openAiApi": {
+          "id": "aWaYU4wiYJ60xKFJ",
+          "name": "vLLM account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "Qwen/Qwen2.5-32B-Instruct",
+          "mode": "list",
+          "cachedResultName": "Qwen/Qwen2.5-32B-Instruct"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        3020,
+        1520
+      ],
+      "id": "8b40db65-4620-488d-9f48-e5d265a5c644",
+      "name": "OpenAI Chat Model3",
+      "credentials": {
+        "openAiApi": {
+          "id": "aWaYU4wiYJ60xKFJ",
+          "name": "vLLM account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return {'relevant_context': $input.all().map(item=>item.json.content).join(\"\\n\\n\\n\\n\")};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1860,
+        420
+      ],
+      "id": "e68d05f3-1969-42e8-b7c2-541796222787",
+      "name": "Set Relevant Context"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"question_feedback\": {\n\t\t\t\"type\": \"string\"\n\t\t},\n\t\t\"reason_feedback\": {\n\t\t\t\"type\": \"string\"\n\t\t}\n\t}\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        1560,
+        1220
+      ],
+      "id": "63dc7fa5-5a2f-46e4-83e1-a2ecc0bf6703",
+      "name": "Feedback Output Parser"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ae0c2955-1d90-4411-b8b4-c9439b07065c",
+              "name": "question_feedback",
+              "value": "={{ $json.output.question_feedback }}",
+              "type": "string"
+            },
+            {
+              "id": "00a535b7-bca2-4561-a38b-282d79f706be",
+              "name": "reason_feedback",
+              "value": "={{ $json.output.reason_feedback }}",
+              "type": "string"
+            },
+            {
+              "id": "615e0e64-4f0c-40b2-957a-7ec9eb7beda5",
+              "name": "question",
+              "value": "={{ $('Gather Information for Refine 1').item.json.question }}",
+              "type": "string"
+            },
+            {
+              "id": "a9f1ae83-617e-4581-b7ef-108089670034",
+              "name": "reason",
+              "value": "={{ $('Gather Information for Refine 1').item.json.reason }}",
+              "type": "string"
+            },
+            {
+              "id": "8c48df1a-7ddd-469a-ab10-ba55b572f127",
+              "name": "proposal_law",
+              "value": "={{ $('Gather Information for Refine 1').item.json.proposal_law }}",
+              "type": "string"
+            },
+            {
+              "id": "21383900-52f5-445c-b543-b76c6eb61c00",
+              "name": "relevant_context",
+              "value": "={{ $('Gather Information for Refine 1').item.json.relevant_context }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1920,
+        700
+      ],
+      "id": "d04df894-9286-468f-b36c-baaa8749b1b6",
+      "name": "Feedback 1 Mapping"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"rewritten_question\": {\n\t\t\t\"type\": \"string\"\n\t\t},\n\t\t\"rewritten_reason\": {\n\t\t\t\"type\": \"string\"\n\t\t}\n\t}\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        2340,
+        1220
+      ],
+      "id": "546e5826-1fd0-4142-9373-4c60050b8a5b",
+      "name": "Refine Output Parser"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ae0c2955-1d90-4411-b8b4-c9439b07065c",
+              "name": "question_feedback",
+              "value": "={{ $json.output.question_feedback }}",
+              "type": "string"
+            },
+            {
+              "id": "00a535b7-bca2-4561-a38b-282d79f706be",
+              "name": "reason_feedback",
+              "value": "={{ $json.output.reason_feedback }}",
+              "type": "string"
+            },
+            {
+              "id": "615e0e64-4f0c-40b2-957a-7ec9eb7beda5",
+              "name": "question",
+              "value": "={{ $('Gather Information for Refine 2').item.json.question }}",
+              "type": "string"
+            },
+            {
+              "id": "a9f1ae83-617e-4581-b7ef-108089670034",
+              "name": "reason",
+              "value": "={{ $('Gather Information for Refine 2').item.json.reason }}",
+              "type": "string"
+            },
+            {
+              "id": "8c48df1a-7ddd-469a-ab10-ba55b572f127",
+              "name": "proposal_law",
+              "value": "={{ $('Gather Information for Refine 2').item.json.proposal_law }}",
+              "type": "string"
+            },
+            {
+              "id": "21383900-52f5-445c-b543-b76c6eb61c00",
+              "name": "relevant_context",
+              "value": "={{ $('Gather Information for Refine 2').item.json.relevant_context }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1920,
+        920
+      ],
+      "id": "5592ad29-6398-4b95-a29b-225cb9f8bf0a",
+      "name": "Feedback 2 Mapping"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<proposal_law>\n{{ $json.proposal_law }}\n</proposal_law>\n\n<question>\n{{ $json.question }}\n</question>\n\n<reason>\n{{ $json.reason }}\n</reason>\n\n<original_question>\n{{ $('Gather Information for Refine 1').item.json.question }}\n</original_question>\n\n<original_reason>\n{{ $('Gather Information for Refine 1').item.json.reason }}\n</original_reason>\n",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=As a legal expert and commentator on Vietnamese laws, your role is to provide constructive feedback on proposed legislation. \n\n<instruction>\n1. You are given a text whose form like below:\n<proposal_law>\n# The proposal law we need to check for the inconsistency, in Vietnamese\n</proposal_law>\n\n<question>\n# A question to raise potential conflicts caused by the proposed law on the relevant context in Vietnamese. This may contain content not in the original. If there is, fix it.\n</question>\n\n<reason>\n# The reason behind the question in Vietnamese, answering why the question matter\n</reason>\n\n<original_question>\n# The original confict question in Vietnamese, use as a reference so that the improved question doesn't go astray\n</original_question>\n\n<original_reason>\n# The original confict reason in Vietnamese, use as a reference so that the improved question doesn't go astray\n</original_reason>\n\n\n2. Your task involves analyzing proposed law to give feedback to the question that highlights potential conflicts, and the reasons behind those conflicts. You can consult the below criteria:\n- Relevant: Ensure the question and reasons are directly related to the proposed law and its context.\n- Informative: The question and reasons should reflect real and logical conflicts within the relevant legal framework.\n- Consistency: Avoid introducing new concepts or ideas that are not present in the proposal or relevant laws.\n- Specificity: Focus on concrete issues rather than abstract concepts, addressing the main points directly.\n3. For each feedback, recommend the way to improve the question (or the reason) to maximize the criteria.\n</instruction>\n\n<output>\nGo directly to the feedback without any introduction. Be as detailed as possible. Response in JSON format, of the following form:\n```json\n{\n  'question_feedback': # Your unified feedback, and recommendation for improvement for question written in Vietnamese,\n  'reason_feedback': # Your unified feedback, and recommendation for improvement for the reason written in Vietnamese\n}\n```\n</output>"
+            }
+          ]
+        }
+      },
+      "id": "9c9c8213-1ddb-465d-8244-d1a18dd41462",
+      "name": "Feedback 2",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        1560,
+        920
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<proposal_law>\n{{ $json.proposal_law }}\n</proposal_law>\n\n<question>\n{{ $json.question }}\n</question>\n\n<reason>\n{{ $json.reason }}\n</reason>\n\n<question_feedback>\n{{ $json.question_feedback }}\n</question_feedback>\n\n<reason_feedback>\n{{ $json.reason_feedback }}\n</reason_feedback>\n\n<original_question>\n{{ $('Gather Information for Refine 1').item.json.question }}\n</original_question>\n\n<original_reason>\n{{ $('Gather Information for Refine 1').item.json.reason }}\n</original_reason>",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=As an expert in Vietnamese linguistic and excel lawyer, you have an excellent ability in Vietnamese laws understanding and inconsistency checking.\n<instruction>\n1. You are given items as follow:\n<proposal_law>\n# The proposal law we need to check for the inconsistency, in Vietnamese\n</proposal_law>\n\n<question>\n# A question to raise potential conflicts caused by the proposed law on the relevant context in Vietnamese. This may contain content not in the original. If there is, fix it.\n</question>\n\n<reason>\n# The reason behind the question in Vietnamese, answering why the question matter\n</reason>\n\n<question_feedback>\n# The feedback for the current question\n</question_feedback>\n\n<reason_feedback>\n# The feedback for the current reason\n</reason_feedback>\n\n<original_question>\n# The original confict question in Vietnamese, use as a reference so that the improved question doesn't go astray\n</original_question>\n\n<original_reason>\n# The original confict reason in Vietnamese, use as a reference so that the improved question doesn't go astray\n</original_reason>\n\n2. Your task is to rewrite the conflict question and the reason (in Vietnamese) based on the feedback, the proposed law. DO NOT make thing up. You should use the original question and reason, as well as the proposed law to eliminate all irrelevant context appear in the current question and reason.\n<\\intruction>"
+            }
+          ]
+        }
+      },
+      "id": "61bcf1e8-e4e9-46a4-8f52-f0e145c0e144",
+      "name": "Refine 2",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        2120,
+        920
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const list_of_questions = $json.output;\nconst relevant_context = $('Set Relevant Context').first().json.relevant_context;\nvar list_of_full_message = [];\nfor (const question of list_of_questions) {\n  list_of_full_message.push(\n    {\n      'question': question.question,\n      'reason': question.reason,\n      'proposal_law': $('User Query').first().json.chatInput,\n      'relevant_context': relevant_context\n    }\n  );\n}\n\nreturn list_of_full_message;"
+      },
+      "id": "9294094f-6152-4f17-8d68-cd47d0ddc0e2",
+      "name": "Gather Information for Refine 1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const list_of_improved_questions = $input.all().map(item => item.json.output);\nconst relevant_context = $('Set Relevant Context').first().json.relevant_context;\nconst proposal_law = $('User Query').first().json.chatInput;\nvar list_of_enhanced_message = [];\nfor (const question of list_of_improved_questions) {\n  list_of_enhanced_message.push(\n    {\n      'question': question.rewritten_question,\n      'reason': question.rewritten_reason,\n      'proposal_law': proposal_law,\n      'relevant_context': relevant_context\n    }\n  );\n}\n\nreturn list_of_enhanced_message;"
+      },
+      "id": "1c71c91f-7705-4ced-bce8-af6192b76c8b",
+      "name": "Gather Information for Refine 2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        920
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.207.163.17:80/api/v1/retrieval",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "question",
+              "value": "={{ $json.question }}"
+            },
+            {
+              "name": "dataset_ids",
+              "value": "={{ ['072af22e103811f08af30242c0a8b006'] }}"
+            },
+            {
+              "name": "similarity_threshold",
+              "value": "0.2"
+            },
+            {
+              "name": "vector_similarity_weight",
+              "value": "0.5"
+            },
+            {
+              "name": "top_k",
+              "value": "10"
+            },
+            {
+              "name": "page_size",
+              "value": "5"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "71019d8f-a65f-4a09-aa01-e21fed0001bb",
+      "name": "Retrieve From RAGFlow1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2720,
+        920
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "5IkKu0p5TGaZtLv7",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1st refined questions\nconst first_refined_questions = $('Refine 1').all().map(item=>item.json.output);\n// 2nd refined questions\nconst second_refined_questions = $('Refine 2').all().map(item=>item.json.output);\n\nconst list_of_questions = [...first_refined_questions, ...second_refined_questions];\nconst proposal_law = $('User Query').first().json.chatInput;\nconst relevant_context = $('Set Relevant Context').first().json.relevant_context;\nvar list_of_full_questions = [];\nfor (const question of list_of_questions) {\n  list_of_full_questions.push(\n    {\n      'proposal_law': proposal_law,\n      'question': question.rewritten_question,\n      'reason': question.rewritten_reason,\n      'relevant_context': relevant_context\n    }\n  );\n}\n\nreturn list_of_full_questions;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2520,
+        920
+      ],
+      "id": "e4719fef-1a85-4acc-bd35-8bddbced01b1",
+      "name": "Prepare Information for New Retrieval"
+    },
+    {
+      "parameters": {
+        "jsCode": "var list_of_questions_with_new_context = [];\nfor (let i=0; i<$input.all().length; i++) {\n  const question = $('Prepare Information for New Retrieval').all()[i].json;\n  question.relevant_context = $input.all()[i].json.data.chunks.map(item=>item.content.trim()).join(\"\\n\\n=====================\\n\\n\");\n  list_of_questions_with_new_context.push(question);\n}\n\nreturn list_of_questions_with_new_context;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2940,
+        920
+      ],
+      "id": "aa650c45-e443-4dd1-aff1-fc8d919e953e",
+      "name": "Prepare Input for Debating"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<proposal_law>\n{{ $json.proposal_law }}\n</proposal_law>\n\n<question>\n{{ $json.question }}\n</question>\n\n<reason>\n{{ $json.reason }}\n</reason>",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=As an expert in Vietnamese linguistic and excel lawyer, you have an excellent ability in Vietnamese laws understanding and inconsistency checking.\n<instruction>\n1. You are given items as follow:\n<proposal_law>\n# The proposal law we need to check for the inconsistency, in Vietnamese\n</proposal_law>\n\n<question>\n# A question to raise potential conflicts caused by the proposed law on the relevant context in Vietnamese.\n</question>\n\n<reason>\n# The reason behind the question in Vietnamese, answering why the question matter\n</reason>\n\n2. Your task is to answer the conflict question and judge the reason (in Vietnamese) base on the proposed law. DO NOT make thing up.\n<\\intruction>\n\n<output>\n```json\n{\n  'answer': # The short answer for the question based on the proposal law in Vietnamese,\n  'reason': # The reason behind the answer, based on the proposal law in Vietnamese,\n  'violate': # Boolean, true if the question violates the proposal law\n}\n```\n</output>"
+            }
+          ]
+        }
+      },
+      "id": "08c5aaae-87f3-4b1e-aba0-6be3a7cd072a",
+      "name": "Proposal Answer 1",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        3280,
+        680
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<official_law>\n{{ $json.relevant_context }}\n</official_law>\n\n<question>\n{{ $json.question }}\n</question>\n\n<reason>\n{{ $json.reason }}\n</reason>",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=As an expert in Vietnamese linguistic and excel lawyer, you have an excellent ability in Vietnamese laws understanding and inconsistency checking.\n<instruction>\n1. You are given items as follow:\n<official_law>\n# The proposal law we need to check for the inconsistency, in Vietnamese\n</official_law>\n\n<question>\n# A question to raise potential conflicts caused by the proposed law on the relevant context in Vietnamese.\n</question>\n\n<reason>\n# The reason behind the question in Vietnamese, answering why the question matter\n</reason>\n\n2. Your task is to answer the conflict question and judge the reason (in Vietnamese) base on the official law. DO NOT make thing up.\n<\\intruction>\n\n<output>\n```json\n{\n  'answer': # The short answer for the question based on the official law in Vietnamese,\n  'reason': # The reason behind the answer, based on the official law in Vietnamese,\n  'violate': # Boolean, true if the question violates the official law\n}\n```\n</output>"
+            }
+          ]
+        }
+      },
+      "id": "c89ecc9f-65df-4e0d-ad1a-0caed1aade5b",
+      "name": "Context Answer 1",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        3280,
+        1180
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "output.answer, output.reason, output.violate",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        3740,
+        940
+      ],
+      "id": "d290c75b-2b2d-49e1-aa31-abd6f4a5f77e",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"answer\": {\n\t\t\t\"type\": \"string\"\n\t\t},\n\t\t\"reason\": {\n\t\t\t\"type\": \"string\"\n\t\t},\n        \"violate\": {\n\t\t\t\"type\": \"boolean\"\n\t\t}\n\t}\n}"
+      },
+      "id": "abf5761e-1e22-487a-adff-234d6a50bd8c",
+      "name": "Answer Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        3600,
+        1580
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserAutofixing",
+      "typeVersion": 1,
+      "position": [
+        3240,
+        1380
+      ],
+      "id": "fdc9ebdd-e89e-4f69-bda6-d80e95ae439e",
+      "name": "Auto-fixing Output Parser"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Retrieve From RAGFlow": {
+      "main": [
+        [
+          {
+            "node": "Decide Relevant Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Retrieved Chunks": {
+      "main": [
+        [
+          {
+            "node": "Set Relevant Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Potential Conflicts": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "CoT Potential Conflicts Generation",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User Query": {
+      "main": [
+        [
+          {
+            "node": "Retrieve From RAGFlow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CoT Potential Conflicts Generation": {
+      "main": [
+        [
+          {
+            "node": "Gather Information for Refine 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieval Decide": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Decide Relevant Content",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Feedback 1": {
+      "main": [
+        [
+          {
+            "node": "Feedback 1 Mapping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide Relevant Content": {
+      "main": [
+        [
+          {
+            "node": "Filter Retrieved Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refine 1": {
+      "main": [
+        [
+          {
+            "node": "Gather Information for Refine 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "CoT Potential Conflicts Generation",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Decide Relevant Content",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Feedback 1",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Refine 1",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Feedback 2",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Refine 2",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Proposal Answer 1",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Context Answer 1",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Auto-fixing Output Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Self-Consistency",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Relevant Context": {
+      "main": [
+        [
+          {
+            "node": "CoT Potential Conflicts Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Feedback Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Feedback 1",
+            "type": "ai_outputParser",
+            "index": 0
+          },
+          {
+            "node": "Feedback 2",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Feedback 1 Mapping": {
+      "main": [
+        [
+          {
+            "node": "Refine 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refine Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Refine 1",
+            "type": "ai_outputParser",
+            "index": 0
+          },
+          {
+            "node": "Refine 2",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Feedback 2 Mapping": {
+      "main": [
+        [
+          {
+            "node": "Refine 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Feedback 2": {
+      "main": [
+        [
+          {
+            "node": "Feedback 2 Mapping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refine 2": {
+      "main": [
+        [
+          {
+            "node": "Prepare Information for New Retrieval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gather Information for Refine 1": {
+      "main": [
+        [
+          {
+            "node": "Feedback 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gather Information for Refine 2": {
+      "main": [
+        [
+          {
+            "node": "Feedback 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve From RAGFlow1": {
+      "main": [
+        [
+          {
+            "node": "Prepare Input for Debating",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Information for New Retrieval": {
+      "main": [
+        [
+          {
+            "node": "Retrieve From RAGFlow1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Input for Debating": {
+      "main": [
+        [
+          {
+            "node": "Proposal Answer 1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Context Answer 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Proposal Answer 1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Context Answer 1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Answer Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Context Answer 1",
+            "type": "ai_outputParser",
+            "index": 0
+          },
+          {
+            "node": "Auto-fixing Output Parser",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto-fixing Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Proposal Answer 1",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "a7f63cbb-3396-462c-aae9-d96062725869",
+  "meta": {
+    "instanceId": "9cc5117b4c04f7253c095ebd1162db62020ea0a309fafa1019759775153c70a0"
+  },
+  "id": "bQLwuficblVoAaRk",
+  "tags": [
+    {
+      "createdAt": "2025-01-22T09:02:19.834Z",
+      "updatedAt": "2025-01-22T09:02:19.834Z",
+      "id": "8R6ppVVt4ceWVh97",
+      "name": "Experimental"
+    },
+    {
+      "createdAt": "2025-01-22T09:01:37.382Z",
+      "updatedAt": "2025-04-08T02:58:44.060Z",
+      "id": "zFOTM2BMc7jSWLpy",
+      "name": "TriNQ"
+    }
+  ]
+}
