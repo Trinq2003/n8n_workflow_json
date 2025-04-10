@@ -1,0 +1,986 @@
+{
+  "name": "RAG Evaluation Benchmarking Dataset Generator",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "e6932c89-356c-4549-a16d-4ffe6438ed44",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        140,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "function promptTempleteGeneration(context) {\n  return {'messages':\n            [\n              {'role': 'system', 'content': 'Imagine that you are a Vietnamese linguistic expert. Based on the content provided below, write 10 questions. Be careful about numbers, and DO NOT make things up. Only rely on the provided context. Avoid using words referring to the document itself, like \"tài liệu này\", to add generality to the questions.\\nOutput requirements:\\n- Your response must be in Vietnamese\\n- You must go directly to the first question, without any introduction or number indices for each question\\n- Enter a newline for new question, one line one question only\\n- The individual question should over tha main content of the given context as much as possible\\n<example>\\nThe provided content is:\\n##############\\n\\\"Xin chào, tôi là Tri\\\"\\n##############\\nThe 10 questions are:\\nTên của tôi là gì?\\nTôi là ai?\\n... until the 10th question.\\n<\\\\example>'\n              },\n              {'role': 'user', 'content': 'The provided content is:\\n##############\\n' + context + '\\n##############\\nThe 10 questions are:'\n              }\n            ]\n         }\n}\n\nlist_of_requests = [];\n\nfor (const chunk of $('List of Chunks').all()) {\n  chunk_content = chunk.json.chunk_content;\n  list_of_requests.push(promptTempleteGeneration(chunk_content));\n} \n\nreturn list_of_requests;\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        1080
+      ],
+      "id": "4d0c159d-ac43-45c5-bcaf-11c51a4ad7ec",
+      "name": "Prompt Formatting"
+    },
+    {
+      "parameters": {
+        "language": "python",
+        "pythonCode": "# Loop over input items and add a new field called 'myNewField' to the JSON of each one\nlist_of_res = [];\nfor i, item in enumerate(_input.all()):\n  res = item.json.choices[0]['message']['content'].split('\\n');\n  list_of_res.append(\n    {\n      'questions':res, \n      'context': _('List of Chunks').all()[i].json['chunk_content'],\n      'dataset_id': _('List of Chunks').all()[i].json['dataset_id'],\n      'dataset_name': _('List of Chunks').all()[i].json['dataset_name'],\n      'document_id': _('List of Chunks').all()[i].json['document_id'],\n      'document_name': _('List of Chunks').all()[i].json['document_name'],\n      'chunk_id': _('List of Chunks').all()[i].json['chunk_id'],\n      'chunk_keywords': _('List of Chunks').all()[i].json['chunk_keywords'],\n      'chunk_proposal_questions': _('List of Chunks').all()[i].json['proposal_questions']\n    }\n  );\nreturn list_of_res;"
+      },
+      "id": "4131e53e-47f6-49d9-8b1c-6b0264c24d4c",
+      "name": "Response Parsing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        1300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.207.163.17:9999/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "Qwen/Qwen2.5-32B-Instruct"
+            },
+            {
+              "name": "messages",
+              "value": "={{ $json.messages }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 20
+            }
+          }
+        }
+      },
+      "id": "6b6f959e-ce7e-4f1b-b964-f85d40084f97",
+      "name": "Question Generator",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        400,
+        1300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.207.163.17:9999/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "Qwen/Qwen2.5-32B-Instruct"
+            },
+            {
+              "name": "messages",
+              "value": "={{ $json.messages }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 20
+            }
+          }
+        }
+      },
+      "id": "53d61640-f8b0-4d4d-a358-5ed0a1049c9d",
+      "name": "Answer Generator",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        400,
+        1500
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "function promptAnswerTempleteGeneration(context, question) {\n  return [\n          {'role': 'system', 'content': 'Imagine that you are an expert in Vietnamese linguistic. You are give a content as source information and a question. You need to find the relevant pieces in the given context and answer the question.\\nOutput requirements:\\n- Be succinct and direct to the answer, no introduction\\n- The answers have to be as short as possible, must go directly to the main focus, no need for the reparaphrasing of the given questions\\n- I expect the answers are no longer than 10 words\\n- One line for the answer only.\\n<example>\\nProvided context: Hello. My name is Tri.\\nQuestion: Who am I?\\nAnswer: Tri\\n<\\\\example>'\n          },\n          {'role': 'user', 'content': 'The question is:\\n##############\\n'+question+'\\n##############\\nThe provided content is:\\n##############\\n'+context+'\\n##############\\nThe short answer for each question are:'\n          }\n        ]\n}\n\nlist_of_requests = [];\n\nfor (const chunk of $('Response Parsing').all()) {\n  chunk_content = chunk.json.context;\n  questions = chunk.json.questions.filter(element => element.trim() !== \"\");\n  dataset_id = chunk.json.dataset_id;\n  dataset_name = chunk.json.dataset_name;\n  document_id = chunk.json.document_id;\n  document_name = chunk.json.document_name;\n  chunk_id = chunk.json.chunk_id;\n  chunk_keywords = chunk.json.chunk_keywords;\n  chunk_proposal_questions = chunk.json.chunk_proposal_questions;\n  for (const question of questions) {\n    list_of_requests.push(\n      {\n        'messages': promptAnswerTempleteGeneration(chunk_content, question),\n        'question': question,\n        'context': chunk_content,\n        'dataset_id': dataset_id,\n        'dataset_name': dataset_name,\n        'document_id': document_id,\n        'document_name': document_name,\n        'chunk_id': chunk_id,\n        'chunk_keywords': chunk_keywords,\n        'chunk_proposal_questions': chunk_proposal_questions\n      }\n    );\n  }\n} \n\nreturn list_of_requests;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        1300
+      ],
+      "id": "cd64e9b7-cdd9-4185-803a-c373bc7c77ba",
+      "name": "Prompt Formatting1"
+    },
+    {
+      "parameters": {
+        "url": "http://10.207.163.17:80/api/v1/datasets",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "page_size",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "df44c2df-7f59-4329-b714-115ccf317833",
+      "name": "Get Datasets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        620,
+        440
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "5IkKu0p5TGaZtLv7",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "var list_of_datasets = [];\nconst regex = /`([^`]*)`/;\nconst list_of_defined_dataset_ids = $('Set Metadata').first().json.dataset_ids;\n\nfor (const dataset of $json.data) {\n  dataset_name = dataset.name;\n \n  dataset_id = dataset.id;\n  raw_dataset_delimiter = dataset.parser_config.delimiter.match(regex);\n  dataset_delimiter = raw_dataset_delimiter === null || raw_dataset_delimiter[1] === '' || typeof raw_dataset_delimiter[1] === 'undefined' ? '':raw_dataset_delimiter[1];\n  if (list_of_defined_dataset_ids.includes(dataset_id)) {\n      list_of_datasets.push(\n      {\n        'id': dataset_id,\n        'name': dataset_name,\n        'delimiter': dataset_delimiter\n      }\n    );\n  }\n}\n\nreturn list_of_datasets;"
+      },
+      "id": "78944d95-c637-4467-b24e-5902366e7d71",
+      "name": "The List of Datasets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=http://10.207.163.17:80/api/v1/datasets/{{ $json.id }}/documents",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "page_size",
+              "value": "1000"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4118d12d-76ef-4f9b-b8ec-ce199b95a28e",
+      "name": "Get Documents in Datasets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        400,
+        660
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "5IkKu0p5TGaZtLv7",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const list_of_datasets = $('The List of Datasets').all();\nvar list_of_datasets_with_documents = [];\n\nfor (let i=0; i<list_of_datasets.length; i++) {\n  dataset = list_of_datasets[i];\n  dataset_name = dataset.json.name; \n  dataset_id = dataset.json.id;\n  dataset_delimiter = dataset.json.delimiter;\n  dataset_documents = [];\n  for (const document of $('Get Documents in Datasets').all()[i].json.data.docs) {\n    document_name = document.name;\n    document_id = document.id;\n    dataset_documents.push(\n      {\n        'document_id': document_id,\n        'document_name': document_name\n      }\n    )\n  }\n  list_of_datasets_with_documents.push({'dataset_id': dataset_id, 'dataset_name': dataset_name, 'delimiter': dataset_delimiter, 'documents': dataset_documents});\n}\n\nreturn list_of_datasets_with_documents;"
+      },
+      "id": "841e0c74-06e2-45cd-b05a-c0436ae4ae82",
+      "name": "The List of Documents in Datasets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        620,
+        660
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=http://10.207.163.17:80/api/v1/datasets/{{ $json.dataset_id }}/documents/{{ $json.document_id }}/chunks",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "page_size",
+              "value": "300"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 10
+            }
+          },
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "edcc2f2a-176b-4767-8908-7c534fbff154",
+      "name": "Get Chunks in Documents in Datasets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        400,
+        880
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "5IkKu0p5TGaZtLv7",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "var list_of_documents = [];\nconst list_of_defined_document_ids = $('Set Metadata').first().json.document_ids;\n\nfor (const dataset of $('The List of Documents in Datasets').all()) {\n  dataset_id = dataset.json.dataset_id;\n  dataset_name = dataset.json.dataset_name;\n  delimiter = dataset.json.delimiter;\n  for (const document of dataset.json.documents) {\n    document_id = document.document_id;\n    document_name = document.document_name;\n    if (list_of_defined_document_ids.includes(document_id)) {\n      list_of_documents.push(\n        {\n          'dataset_id': dataset_id,\n          'dataset_name': dataset_name,\n          'delimiter': delimiter,\n          'document_id': document_id,\n          'document_name': document_name\n        }\n      );\n    };\n  }\n}\n\nreturn list_of_documents;"
+      },
+      "id": "a738d3c7-f6a6-4174-8419-9fe050d2bf53",
+      "name": "List of Documents",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        660
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const list_of_datasets = $('The List of Documents in Datasets').all();\nvar list_of_datasets_with_documents_with_chunks = [];\n\nfor (let i=0; i<list_of_datasets.length; i++) {\n  dataset = list_of_datasets[i];\n  dataset_name = dataset.json.dataset_name; \n  dataset_id = dataset.json.dataset_id;\n  dataset_delimiter = dataset.json.delimiter;\n  dataset_documents = dataset.json.documents;\n  documents = [];\n  for (let j=0; j<dataset_documents.length; j++) {\n    document_name = dataset_documents[j].document_name;\n    document_id = dataset_documents[j].document_id;\n    chunks = [];\n    for (const chunk of $('Get Chunks in Documents in Datasets').all()[i+j].json.data.chunks) {\n      chunk_id = chunk.id;\n      chunk_content = chunk.content;\n      chunk_keywords = chunk.important_keywords;\n      proposal_questions = chunk.questions;\n      chunks.push(\n        {\n          'chunk_id': chunk_id,\n          'chunk_content': chunk_content,\n          'chunk_keywords': chunk_keywords,\n          'proposal_questions': proposal_questions \n        }\n      );\n    }\n    documents.push(\n      {\n        'document_id': document_id,\n        'document_name': document_name,\n        'chunks': chunks\n      }\n    );\n  }\n  list_of_datasets_with_documents_with_chunks.push({'dataset_id': dataset_id, 'dataset_name': dataset_name, 'delimiter': dataset_delimiter, 'documents': documents});\n}\n\nreturn list_of_datasets_with_documents_with_chunks;"
+      },
+      "id": "edfc65cd-2f02-4548-b110-0ed5e03a5ec7",
+      "name": "The List of Chunks in Documents in Dataset",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        620,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### JSON Schema of the final parsing tree\n```json\n{\n  \"dataset_id\": \"string\",\n  \"dataset_name\": \"string\",\n  \"delimiter\": \"string\",\n  \"documents\": [\n    {\n      \"document_id\": \"string\",\n      \"document_name\": \"string\",\n      \"chunks\": [\n        {\n          \"chunk_id\": \"string\",\n          \"chunk_content\": \"string\"\n        }\n      ]\n    }\n  ]\n}\n```",
+        "height": 334.68724614134857,
+        "width": 343.98050365556435,
+        "color": 3
+      },
+      "id": "8db2013b-0529-46d1-bf9b-67803b38c01b",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "var list_of_chunks = [];\nfor (const dataset of $('The List of Chunks in Documents in Dataset').all()) {\n  dataset_id = dataset.json.dataset_id;\n  dataset_name = dataset.json.dataset_name;\n  delimiter = dataset.json.delimiter;\n  for (const document of dataset.json.documents) {\n    document_id = document.document_id;\n    document_name = document.document_name;\n    for (const chunk of document.chunks) {\n      chunk_id = chunk.chunk_id;\n      chunk_content = chunk.chunk_content;\n      chunk_keywords = chunk.chunk_keywords;\n      proposal_questions = chunk.proposal_questions;\n      list_of_chunks.push(\n        {\n          'dataset_id': dataset_id,\n          'dataset_name': dataset_name,\n          'delimiter': delimiter,\n          'document_id': document_id,\n          'document_name': document_name,\n          'chunk_id': chunk_id,\n          'chunk_keywords': chunk_keywords,\n          'proposal_questions': proposal_questions,\n          'chunk_content': chunk_content.split(delimiter).join('')\n        }\n      );\n    }\n  }\n}\n\nreturn list_of_chunks;"
+      },
+      "id": "c94efaf3-57d9-4f9c-9742-1ddf8d6133b8",
+      "name": "List of Chunks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "language": "python",
+        "pythonCode": "list_of_res = []\nfor i, item in enumerate(_input.all()):\n  res = item.json.choices[0]['message']['content'].strip()\n  question = _('Prompt Formatting1').all()[i].json.question\n  context = _('Prompt Formatting1').all()[i].json.context\n  dataset_id = _('Prompt Formatting1').all()[i].json.dataset_id\n  dataset_name = _('Prompt Formatting1').all()[i].json.dataset_name\n  document_id = _('Prompt Formatting1').all()[i].json.document_id\n  document_name = _('Prompt Formatting1').all()[i].json.document_name\n  chunk_id = _('Prompt Formatting1').all()[i].json.chunk_id\n  chunk_keywords = _('Prompt Formatting1').all()[i].json.chunk_keywords\n  chunk_proposal_questions = _('Prompt Formatting1').all()[i].json.chunk_proposal_questions\n  list_of_res.append(\n    {\n      'dataset_id': dataset_id,\n      'dataset_name': dataset_name,\n      'document_id': document_id,\n      'document_name': document_name,\n      'chunk_id': chunk_id,\n      'chunk_keywords': chunk_keywords,\n      'chunk_proposal_questions': chunk_proposal_questions,\n      'question': question, \n      'answer': res,\n      'context': context,\n    }\n  )\nreturn list_of_res"
+      },
+      "id": "3e9a9c9a-b380-40d4-9c34-bcc70c08eb07",
+      "name": "Information Gather",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        1500
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://10.207.163.17:80/api/v1/retrieval",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "page_size",
+              "value": "10"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "question",
+              "value": "={{ $json.question }}"
+            },
+            {
+              "name": "dataset_ids",
+              "value": "={{ $json.dataset_ids }}"
+            },
+            {
+              "name": "top_k",
+              "value": "5"
+            },
+            {
+              "name": "similarity_threshold",
+              "value": "0.2"
+            },
+            {
+              "name": "keyword",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 100
+            }
+          },
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "869920cb-addf-4a22-87ed-dc313912c122",
+      "name": "Retrieves Chunks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1060,
+        1500
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "5IkKu0p5TGaZtLv7",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "var list_of_questions_for_retrieval = [];\nlist_of_datasets = [];\nfor (const dataset of $('The List of Datasets').all()) {\n  dataset_id = dataset.json.id;\n  list_of_datasets.push(dataset_id);\n}\n\nfor (const item of $input.all()) {\n  question = item.json.question;\n  list_of_questions_for_retrieval.push(\n    {\n      'question': question,\n      'dataset_ids': list_of_datasets\n    }\n  );\n}\n\nreturn list_of_questions_for_retrieval;"
+      },
+      "id": "84c825a1-29af-47d0-8ee0-7e0407f08093",
+      "name": "Prepare for Retrieval",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        1500
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c2f9c950-1390-4a8b-9bfe-2803ff0e6ab0",
+              "name": "dataset_id",
+              "value": "={{ $('Information Gather').item.json.dataset_id }}",
+              "type": "string"
+            },
+            {
+              "id": "ef7eaab0-b786-4fdd-b534-6737bdc84a55",
+              "name": "dataset_name",
+              "value": "={{ $('Information Gather').item.json.dataset_name }}",
+              "type": "string"
+            },
+            {
+              "id": "0967624e-25c7-4b85-8595-f6af6d6b7631",
+              "name": "document_id",
+              "value": "={{ $('Information Gather').item.json.document_id }}",
+              "type": "string"
+            },
+            {
+              "id": "9d640168-2478-47c2-b8a5-ad14c2e048a1",
+              "name": "document_name",
+              "value": "={{ $('Information Gather').item.json.document_name }}",
+              "type": "string"
+            },
+            {
+              "id": "230eaef4-10a4-4013-b350-f57a42884d0e",
+              "name": "chunk_id",
+              "value": "={{ $('Information Gather').item.json.chunk_id }}",
+              "type": "string"
+            },
+            {
+              "id": "8fbaedd7-bfaf-4e22-a212-12627ac3edd7",
+              "name": "chunk_keywords",
+              "value": "={{ $('Information Gather').item.json.chunk_keywords }}",
+              "type": "array"
+            },
+            {
+              "id": "26464fd6-cce3-4d22-a69c-4f38b43ddda1",
+              "name": "chunk_proposal_questions",
+              "value": "={{ $('Information Gather').item.json.chunk_proposal_questions }}",
+              "type": "array"
+            },
+            {
+              "id": "0a578651-53a3-4438-95f8-83d2d0bd13b1",
+              "name": "question",
+              "value": "={{ $('Information Gather').item.json.question }}",
+              "type": "string"
+            },
+            {
+              "id": "891e7848-b58e-48d3-8374-86a3522988f3",
+              "name": "answer",
+              "value": "={{ $('Information Gather').item.json.answer }}",
+              "type": "string"
+            },
+            {
+              "id": "f01c2dd8-1a2d-40f7-a24d-7de3e7e91e2c",
+              "name": "context",
+              "value": "={{ $('Information Gather').item.json.context.trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "a13e7431-b9b5-4601-9808-3c6799b04d46",
+              "name": "retrieved_chunks",
+              "value": "={{ $json.data.chunks.slice(0, 5) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4350de38-b5de-469b-abe0-2977bff51560",
+      "name": "Gather Information",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1280,
+        1500
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c2f9c950-1390-4a8b-9bfe-2803ff0e6ab0",
+              "name": "dataset_id",
+              "value": "={{ $('Information Gather').item.json.dataset_id }}",
+              "type": "string"
+            },
+            {
+              "id": "ef7eaab0-b786-4fdd-b534-6737bdc84a55",
+              "name": "dataset_name",
+              "value": "={{ $('Information Gather').item.json.dataset_name }}",
+              "type": "string"
+            },
+            {
+              "id": "0967624e-25c7-4b85-8595-f6af6d6b7631",
+              "name": "document_id",
+              "value": "={{ $('Information Gather').item.json.document_id }}",
+              "type": "string"
+            },
+            {
+              "id": "9d640168-2478-47c2-b8a5-ad14c2e048a1",
+              "name": "document_name",
+              "value": "={{ $('Information Gather').item.json.document_name }}",
+              "type": "string"
+            },
+            {
+              "id": "230eaef4-10a4-4013-b350-f57a42884d0e",
+              "name": "chunk_id",
+              "value": "={{ $('Information Gather').item.json.chunk_id }}",
+              "type": "string"
+            },
+            {
+              "id": "8fbaedd7-bfaf-4e22-a212-12627ac3edd7",
+              "name": "chunk_keywords",
+              "value": "={{ $('Information Gather').item.json.chunk_keywords.join(\"; \") }}",
+              "type": "string"
+            },
+            {
+              "id": "26464fd6-cce3-4d22-a69c-4f38b43ddda1",
+              "name": "chunk_proposal_questions",
+              "value": "={{ $('Information Gather').item.json.chunk_proposal_questions.join(\"\\n\")}}",
+              "type": "string"
+            },
+            {
+              "id": "0a578651-53a3-4438-95f8-83d2d0bd13b1",
+              "name": "question",
+              "value": "={{ $('Information Gather').item.json.question }}",
+              "type": "string"
+            },
+            {
+              "id": "891e7848-b58e-48d3-8374-86a3522988f3",
+              "name": "answer",
+              "value": "={{ $('Information Gather').item.json.answer }}",
+              "type": "string"
+            },
+            {
+              "id": "f01c2dd8-1a2d-40f7-a24d-7de3e7e91e2c",
+              "name": "context",
+              "value": "={{ $('Information Gather').item.json.context.trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "a13e7431-b9b5-4601-9808-3c6799b04d46",
+              "name": "retrieved_chunks_1",
+              "value": "={{ \"dataset_id: \" + $json.retrieved_chunks[0].dataset_id + \"\\ndocument_id: \" + $json.retrieved_chunks[0].document_id + \"\\nchunk_id: \" + $json.retrieved_chunks[0].id + \"\\n========================================\\n\" + $json.retrieved_chunks[0].content.trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "524b8da5-7ea8-4bd3-b8d3-91fee81ef27d",
+              "name": "retrieved_chunks_2",
+              "value": "={{ \"dataset_id: \" + $json.retrieved_chunks[1].dataset_id + \"\\ndocument_id: \" + $json.retrieved_chunks[1].document_id + \"\\nchunk_id: \" + $json.retrieved_chunks[1].id + \"\\n========================================\\n\" + $json.retrieved_chunks[1].content.trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "9f7ab527-9c70-40c2-883e-5416194e0070",
+              "name": "retrieved_chunks_3",
+              "value": "={{ \"dataset_id: \" + $json.retrieved_chunks[2].dataset_id + \"\\ndocument_id: \" + $json.retrieved_chunks[2].document_id + \"\\nchunk_id: \" + $json.retrieved_chunks[2].id + \"\\n========================================\\n\" + $json.retrieved_chunks[2].content.trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "98531666-f54e-4379-bb7e-060ee4450b46",
+              "name": "retrieved_chunks_4",
+              "value": "={{ \"dataset_id: \" + $json.retrieved_chunks[3].dataset_id + \"\\ndocument_id: \" + $json.retrieved_chunks[3].document_id + \"\\nchunk_id: \" + $json.retrieved_chunks[3].id + \"\\n========================================\\n\" + $json.retrieved_chunks[3].content.trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "ad98f3cb-77a7-48b4-b3ff-f19c646f2722",
+              "name": "retrieved_chunks_5",
+              "value": "={{ \"dataset_id: \" + $json.retrieved_chunks[4].dataset_id + \"\\ndocument_id: \" + $json.retrieved_chunks[4].document_id + \"\\nchunk_id: \" + $json.retrieved_chunks[4].id + \"\\n========================================\\n\" + $json.retrieved_chunks[4].content.trim() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3775179d-bc3b-42c0-9008-d9895a35aec5",
+      "name": "Gather Information for CSV",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1280,
+        1720
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/data/benchmark/ragflow_evaluation.json",
+        "options": {
+          "append": false
+        }
+      },
+      "id": "0675e59a-1aa3-44e3-b649-67b945006eab",
+      "name": "Save JSON",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1720,
+        1500
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/data/benchmark/ragflow_evaluation.xlsx",
+        "options": {
+          "append": false
+        }
+      },
+      "id": "595d06af-dd11-4316-a03c-fc7b85fa7809",
+      "name": "Save XLSX",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1720,
+        1720
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {}
+      },
+      "id": "48a0398e-4ac5-464b-b896-bbf91f31c04e",
+      "name": "Convert to XLSX",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1500,
+        1720
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "options": {}
+      },
+      "id": "7480fdf6-317c-4295-96ed-45f7045a3287",
+      "name": "Convert to JSON",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1500,
+        1500
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "75c2df96-1a97-46f2-9072-bcfa9edde663",
+              "name": "dataset_ids",
+              "value": "={{ [\"072af22e103811f08af30242c0a8b006\"] }}",
+              "type": "array"
+            },
+            {
+              "id": "e1ae6093-ec34-4c2c-9133-aa6e42e40554",
+              "name": "document_ids",
+              "value": "={{ [\"3bf08fb6103b11f0bd2a0242c0a8b006\"] }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d7f9e5b9-8ebc-4db9-9f62-fea25d244dcd",
+      "name": "Set Metadata",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        400,
+        440
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Set Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Question Generator": {
+      "main": [
+        [
+          {
+            "node": "Response Parsing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Response Parsing": {
+      "main": [
+        [
+          {
+            "node": "Prompt Formatting1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt Formatting1": {
+      "main": [
+        [
+          {
+            "node": "Answer Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer Generator": {
+      "main": [
+        [
+          {
+            "node": "Information Gather",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Datasets": {
+      "main": [
+        [
+          {
+            "node": "The List of Datasets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "The List of Datasets": {
+      "main": [
+        [
+          {
+            "node": "Get Documents in Datasets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Documents in Datasets": {
+      "main": [
+        [
+          {
+            "node": "The List of Documents in Datasets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "The List of Documents in Datasets": {
+      "main": [
+        [
+          {
+            "node": "List of Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List of Documents": {
+      "main": [
+        [
+          {
+            "node": "Get Chunks in Documents in Datasets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Chunks in Documents in Datasets": {
+      "main": [
+        [
+          {
+            "node": "The List of Chunks in Documents in Dataset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "The List of Chunks in Documents in Dataset": {
+      "main": [
+        [
+          {
+            "node": "List of Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List of Chunks": {
+      "main": [
+        [
+          {
+            "node": "Prompt Formatting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Information Gather": {
+      "main": [
+        [
+          {
+            "node": "Prepare for Retrieval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare for Retrieval": {
+      "main": [
+        [
+          {
+            "node": "Retrieves Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieves Chunks": {
+      "main": [
+        [
+          {
+            "node": "Gather Information",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gather Information": {
+      "main": [
+        [
+          {
+            "node": "Gather Information for CSV",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Convert to JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gather Information for CSV": {
+      "main": [
+        [
+          {
+            "node": "Convert to XLSX",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to XLSX": {
+      "main": [
+        [
+          {
+            "node": "Save XLSX",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to JSON": {
+      "main": [
+        [
+          {
+            "node": "Save JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Metadata": {
+      "main": [
+        [
+          {
+            "node": "Get Datasets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt Formatting": {
+      "main": [
+        [
+          {
+            "node": "Question Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ddf59cd1-20b5-4b24-a132-0cefda92302c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9cc5117b4c04f7253c095ebd1162db62020ea0a309fafa1019759775153c70a0"
+  },
+  "id": "89iZwj0jrdTlXCw3",
+  "tags": [
+    {
+      "createdAt": "2025-01-22T09:02:19.834Z",
+      "updatedAt": "2025-01-22T09:02:19.834Z",
+      "id": "8R6ppVVt4ceWVh97",
+      "name": "Experimental"
+    },
+    {
+      "createdAt": "2025-01-22T09:01:37.382Z",
+      "updatedAt": "2025-04-08T02:58:44.060Z",
+      "id": "zFOTM2BMc7jSWLpy",
+      "name": "TriNQ"
+    }
+  ]
+}
