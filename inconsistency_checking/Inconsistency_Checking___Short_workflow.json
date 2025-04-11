@@ -1,0 +1,356 @@
+{
+  "name": "Inconsistency Checking | Short workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.207.163.17:80/api/v1/retrieval",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "question",
+              "value": "={{ $json.chatInput }}"
+            },
+            {
+              "name": "dataset_ids",
+              "value": "={{ ['95b14296141b11f0b4a90242c0a8b006'] }}"
+            },
+            {
+              "name": "similarity_threshold",
+              "value": "0.2"
+            },
+            {
+              "name": "vector_similarity_weight",
+              "value": "0.5"
+            },
+            {
+              "name": "top_k",
+              "value": "20"
+            },
+            {
+              "name": "page_size",
+              "value": "20"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9c8e4176-f202-4283-9219-061c356df510",
+      "name": "Retrieve From RAGFlow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        100,
+        -320
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "5IkKu0p5TGaZtLv7",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "var related_chunks = [];\nfor (let i=0; i<$input.all().length; i++) {\n  if ($input.all()[i].json.text === \"related\") {\n    chunk = $('Retrieve From RAGFlow').all()[0].json.data.chunks[i];\n    related_chunks.push(\n      {\n        'dataset_id': chunk.dataset_id,\n        'document_id': chunk.document_id,\n        'chunk_id': chunk.id,\n        'keywords': chunk.important_keywords,\n        'content': chunk.content\n      }\n    );\n  } \n}\n\nreturn related_chunks;"
+      },
+      "id": "4e76c2e9-70a7-40f8-801f-65fc3635be6e",
+      "name": "Filter Retrieved Chunks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1180,
+        -320
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"reason\": {\n        \"type\": \"string\"\n      }\n    },\n    \"required\": [\"reason\"],\n    \"additionalProperties\": false\n  }\n}"
+      },
+      "id": "3fac6066-8c5a-4f94-83f3-f374cce5cd1f",
+      "name": "Potential Conflicts",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        400,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "separator": "\\n"
+        }
+      },
+      "id": "74a45703-5691-4ea6-83db-418c8f944859",
+      "name": "Retrieval Decide",
+      "type": "@n8n/n8n-nodes-langchain.outputParserItemList",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<query>\n{{ $('User Query').item.json.chatInput }}\n</query>\n\n<context>\n{{ $json.data.chunks.slice(0, 10).map(item => \"- \" + item.content + \"\\n\") }}\n</context>",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=As an expert Vietnamese lawyer, your task is to determine which law applies to a specific query. You need to ensure that the laws you consider are consistent.\n<instruction>\nYou will be provided with a query and a list of five relevant contexts (all written in Vietnamese). Carefully read through each context and decide whether it is directly relevant to the query.\n</instruction>\n<output>\nYour output should indicate \"related\" or \"unrelated\" for each context, with each response on a separate line.\n</output>\n"
+            },
+            {
+              "type": "HumanMessagePromptTemplate",
+              "message": "=<query>\nTrường hợp ngang nhau thì bên có ý kiến của Chủ tịch Hội sẽ được chấp thuận. 3. Ban Chấp hành có nhiệm vụ và quyền hạn sau đây: a) Quyết định các biện pháp thực hiện nghị quyết, chương trình hoạt động trong nhiệm kỳ của Đại hội; b) Quyết định chương trình, kế hoạch công tác hàng năm hoặc giữa các kỳ họp của Ban Chấp hành; c) Thông qua kế hoạch và quyết toán tài chính nhiệm kỳ và hàng năm của Hội;\n</query>\n\n<context>\n- V. Hồ sơ, gồm: Điều 14. Ban Chấp hành Hội (hoặc tên gọi khác) 3. Nguyên tắc hoạt động của Ban Chấp hành: d) Các nghị quyết, quyết định của Ban Chấp hành được thông qua khi có trên ... tổng số ủy viên Ban Chấp hành dự họp biểu quyết tán thành. Trong trường hợp số ý kiến tán thành và không tán thành ngang nhau thì quyết định thuộc về bên có ý kiến của Chủ tịch Hội. Điều 15. Ban Thường vụ Hội (hoặc tên gọi khác) 1. Ban Thường vụ Hội do Ban Chấp hành bầu trong số các ủy viên Ban Chấp hành; Ban Thường vụ Hội gồm: Chủ tịch, các Phó Chủ tịch và các ủy viên. Số lượng, cơ cấu, tiêu chuẩn ủy viên Ban Thường vụ do Ban Chấp hành quyết định. Nhiệm kỳ của Ban Thường vụ cùng với nhiệm kỳ Đại hội. 2. Nhiệm vụ và quyền hạn của Ban Thuờng vụ:\n- Điều 13. Ban Chấp hành Trung ương Hội 2. Ban Chấp hành hoạt động theo Quy chế và Điều lệ Hội. Ban Chấp hành họp thường kỳ mỗi năm một lần; khi cần thiết có thể họp bất thường. Các quyết định, nghị quyết của Ban Chấp hành được thông qua và có hiệu lực khi có trên 50% tổng số ủy viên chính thức dự họp tán thành. Trường hợp ngang nhau thì bên có ý kiến của Chủ tịch Hội sẽ được chấp thuận. 3. Ban Chấp hành có nhiệm vụ và quyền hạn sau đây: a) Quyết định các biện pháp thực hiện nghị quyết, chương trình hoạt động trong nhiệm kỳ của Đại hội; b) Quyết định chương trình, kế hoạch công tác hàng năm hoặc giữa các kỳ họp của Ban Chấp hành; c) Thông qua kế hoạch và quyết toán tài chính nhiệm kỳ và hàng năm của Hội;\n- Điều 14. Ban Chấp hành Hội 4. Nguyên tắc hoạt động của Ban Chấp hành: d) Các nghị quyết, quyết định của Ban Chấp hành được thông qua khi có trên 1/2 (một phần hai) tổng số ủy viên Ban Chấp hành tham gia dự họp biểu quyết tán thành. Trường hợp số ý kiến tán thành và không tán thành ngang nhau thì quyết định thuộc về bên có ý kiến của Chủ tịch Hội. Điều 15. Ban Thường vụ Hội 1. Ban Thường vụ Hội do Ban Chấp hành bầu trong số các ủy viên Ban Chấp hành; Ban Thường vụ Hội gồm: Chủ tịch, các Phó Chủ tịch, Tổng thư ký và các ủy viên. Số lượng, cơ cấu, tiêu chuẩn ủy viên Ban Thường vụ do Ban Chấp hành Hội quyết định. Nhiệm kỳ của Ban Thường vụ cùng với nhiệm kỳ Đại hội. 2. Nhiệm vụ, quyền hạn của Ban Thường vụ:\n- V. Hồ sơ, gồm: Điều 14. Ban Chấp hành Hội (hoặc tên gọi khác) 3. Nguyên tắc hoạt động của Ban Chấp hành: d) Các nghị quyết, quyết định của Ban Chấp hành được thông qua khi có trên ... tổng số ủy viên Ban Chấp hành dự họp biểu quyết tán thành. Trong trường hợp số ý kiến tán thành và không tán thành ngang nhau thi quyết định thuộc về bên có ý kiến của Chủ tịch Hội. Điều 15. Ban Thường vụ Hội (hoặc tên gọi khác) 1- Ban Thường vụ Hội do Ban Chấp hành bầu trong số các ủy viên Ban Chấp hành; Ban Thường vụ Hội gồm: Chủ tịch, các Phó Chủ tịch và các ủy viên, số lượng, cơ cấu, tiêu chuẩn ủy viên Ban Thường vụ do Ban Chấp hành quyết định. Nhiệm kỳ của Ban Thường vụ cùng với nhiệm kỳ Đại hội. 2. Nhiệm vụ và quyền hạn của Ban Thường vụ:\n- Điều 14. Ban Chấp hành Hội 4. Nguyên tắc hoạt động của Ban Chấp hành: b) Các cuộc họp của Ban Chấp hành được xem là hợp lệ khi có 2/3 (hai phần ba) số lượng ủy viên Ban Chấp hành tham gia dự họp. Ban Chấp hành biểu quyết theo nguyên tắc quá bán, thiểu số phục tùng đa số. Trong trường hợp biểu quyết ngang nhau thì quyết định thuộc về bên có ý kiến của Chủ tịch Hội hoặc người chủ trì hội nghị. Ban Chấp hành có thể biểu quyết bằng hình thức giơ tay hoặc bỏ phiếu kín. Việc quy định hình thức biểu quyết họp Ban Chấp hành do Ban Chấp hành Hội quyết định; c) Giữa hai kỳ họp Ban Chấp hành để quyết định các vấn đề thuộc thẩm quyền của Ban Chấp hành có thể hội ý, thảo luận, thông qua lấy ý kiến bằng văn bản;\n</context>"
+            },
+            {
+              "type": "AIMessagePromptTemplate",
+              "message": "=related\nunrelated\nrelated\nrelated\nunrelated"
+            }
+          ]
+        }
+      },
+      "id": "14994b29-824d-41c3-86bd-8f37110b6d8b",
+      "name": "Decide Relevant Content",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        800,
+        -320
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "Qwen/Qwen2.5-32B-Instruct",
+          "mode": "list",
+          "cachedResultName": "Qwen/Qwen2.5-32B-Instruct"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        580,
+        200
+      ],
+      "id": "3c4d436a-d57c-4e51-9357-8d0161aacd27",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "aWaYU4wiYJ60xKFJ",
+          "name": "vLLM account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -140,
+        -320
+      ],
+      "id": "20cb90c3-76c7-4ce6-9849-dcd8e57de70b",
+      "name": "User Query",
+      "webhookId": "147ee891-7378-4e64-94fd-93a83b2b4233"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<proposal_law>\n{{ $('User Query').first().json.chatInput }}\n</proposal_llaw>\n\n<relevant_context>\n{{ $json.relevant_context }}\n</relevant_context>",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=Imagine that you are an expert in law inconsistency checking. You are given a proposal law and official laws, which are both in Vietnamese. Your task is to analyze and reason if there are any comflict between the proposal law and the official. Please think step by step.\n\n<output>\nOutput in JSON format, specified as follows:\n```json\n[{\n  \"reason\": # The reason why conflicts heppen between the proposal law and official law in Vietnamese, step by step and be as concise as possible.\n}]\n```\n</output>"
+            }
+          ]
+        }
+      },
+      "id": "8cbf5541-7fe2-4a68-9187-a6bdd6a24a92",
+      "name": "CoT Laws Comparison",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        340,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return {'relevant_context': $input.all().map(item=>item.json.content).join(\"\\n\\n\\n\\n\")};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        -320
+      ],
+      "id": "53c843f7-a67c-4af0-a6bf-d89b02e165c0",
+      "name": "Set Relevant Context"
+    },
+    {
+      "parameters": {
+        "jsCode": "return {'content': $input.first().json.data.chunks.map(item=>item.content)};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        -320
+      ],
+      "id": "18ff4d52-d833-4139-a434-5a5a69af6f84",
+      "name": "Split Chunk Content"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Retrieve From RAGFlow": {
+      "main": [
+        [
+          {
+            "node": "Split Chunk Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Retrieved Chunks": {
+      "main": [
+        [
+          {
+            "node": "Set Relevant Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Potential Conflicts": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "CoT Laws Comparison",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieval Decide": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Decide Relevant Content",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide Relevant Content": {
+      "main": [
+        [
+          {
+            "node": "Filter Retrieved Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "CoT Laws Comparison",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Decide Relevant Content",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User Query": {
+      "main": [
+        [
+          {
+            "node": "Retrieve From RAGFlow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Relevant Context": {
+      "main": [
+        [
+          {
+            "node": "CoT Laws Comparison",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Chunk Content": {
+      "main": [
+        [
+          {
+            "node": "Decide Relevant Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6e92bb01-aa0c-472d-80b9-e9db13f8bc69",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9cc5117b4c04f7253c095ebd1162db62020ea0a309fafa1019759775153c70a0"
+  },
+  "id": "7Tj10N0QlaVGYr3h",
+  "tags": [
+    {
+      "createdAt": "2025-01-22T09:02:19.834Z",
+      "updatedAt": "2025-01-22T09:02:19.834Z",
+      "id": "8R6ppVVt4ceWVh97",
+      "name": "Experimental"
+    },
+    {
+      "createdAt": "2025-01-22T09:01:37.382Z",
+      "updatedAt": "2025-04-08T02:58:44.060Z",
+      "id": "zFOTM2BMc7jSWLpy",
+      "name": "TriNQ"
+    }
+  ]
+}

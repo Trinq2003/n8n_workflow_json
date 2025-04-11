@@ -1,5 +1,5 @@
 {
-  "name": "Inconsistency Checking",
+  "name": "Inconsistency Checking | Detailed Logs",
   "nodes": [
     {
       "parameters": {
@@ -25,7 +25,7 @@
             },
             {
               "name": "dataset_ids",
-              "value": "={{ ['072af22e103811f08af30242c0a8b006'] }}"
+              "value": "={{ ['95b14296141b11f0b4a90242c0a8b006'] }}"
             },
             {
               "name": "similarity_threshold",
@@ -88,20 +88,6 @@
         860,
         940
       ]
-    },
-    {
-      "parameters": {
-        "options": {}
-      },
-      "id": "3a9e75b9-480f-4206-8cef-4af6fd37e531",
-      "name": "User Query",
-      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
-      "typeVersion": 1.1,
-      "position": [
-        820,
-        420
-      ],
-      "webhookId": "b1510c34-4ea0-4d44-9d56-9db6377116fa"
     },
     {
       "parameters": {
@@ -214,35 +200,6 @@
         1260,
         420
       ]
-    },
-    {
-      "parameters": {},
-      "id": "fb3e9f8c-a7a0-472b-b397-0b1044e8e229",
-      "name": "Self-Consistency",
-      "type": "@n8n/n8n-nodes-langchain.chainLlm",
-      "typeVersion": 1.4,
-      "position": [
-        4020,
-        1340
-      ]
-    },
-    {
-      "parameters": {
-        "model": {
-          "__rl": true,
-          "mode": "list",
-          "value": "gpt-4o-mini"
-        },
-        "options": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
-      "typeVersion": 1.2,
-      "position": [
-        4020,
-        1620
-      ],
-      "id": "99e85701-0702-4d6c-afd5-b24e232fc89b",
-      "name": "OpenAI Chat Model"
     },
     {
       "parameters": {
@@ -560,7 +517,7 @@
             },
             {
               "name": "dataset_ids",
-              "value": "={{ ['072af22e103811f08af30242c0a8b006'] }}"
+              "value": "={{ ['95b14296141b11f0b4a90242c0a8b006'] }}"
             },
             {
               "name": "similarity_threshold",
@@ -669,21 +626,6 @@
     },
     {
       "parameters": {
-        "mode": "combine",
-        "fieldsToMatchString": "output.answer, output.reason, output.violate",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3.1,
-      "position": [
-        3740,
-        940
-      ],
-      "id": "d290c75b-2b2d-49e1-aa31-abd6f4a5f77e",
-      "name": "Merge"
-    },
-    {
-      "parameters": {
         "schemaType": "manual",
         "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"answer\": {\n\t\t\t\"type\": \"string\"\n\t\t},\n\t\t\"reason\": {\n\t\t\t\"type\": \"string\"\n\t\t},\n        \"violate\": {\n\t\t\t\"type\": \"boolean\"\n\t\t}\n\t}\n}"
       },
@@ -708,6 +650,105 @@
       ],
       "id": "fdc9ebdd-e89e-4f69-bda6-d80e95ae439e",
       "name": "Auto-fixing Output Parser"
+    },
+    {
+      "parameters": {
+        "jsCode": "const list_of_proposal_answers = $('Proposal Answer 1').all().map(item=>item.json.output);\nconst list_of_context_answers = $('Context Answer 1').all().map(item=>item.json.output);\nconst list_of_potential_conflicts = $('Prepare Input for Debating').all().map(item=>item.json);\n\nvar list_of_comments_on_proposal_answers = [];\nfor (let i=0; i<list_of_proposal_answers.length; i++) {\n  list_of_comments_on_proposal_answers.push(\n    {\n      'conflict_question': list_of_potential_conflicts[i].question,\n      'reason_behind_the_question': list_of_potential_conflicts[i].reason,\n      'potential_violation': list_of_proposal_answers[i].violate || list_of_context_answers[i].violate,\n      'reason_on_proposal_law': {\n        'answer': list_of_proposal_answers[i].answer,\n        'reason': list_of_proposal_answers[i].reason\n      },\n      'reason_on_official_law': {\n        'answer': list_of_context_answers[i].answer,\n        'reason': list_of_context_answers[i].reason,\n        'citation': list_of_potential_conflicts[i].relevant_context\n      }\n    }\n  )\n}\n\nreturn list_of_comments_on_proposal_answers;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3960,
+        940
+      ],
+      "id": "1e43cb26-ad71-432a-9ba0-2a3add308d00",
+      "name": "Analyze Answers"
+    },
+    {
+      "parameters": {
+        "html": "<!DOCTYPE html>\n\n<html>\n  <head>\n    <meta charset=\"UTF-8\" />\n    <title>Proposal Law Comments</title>\n  </head>\n  <body>\n    <div class=\"container\">\n      <div class=\"proposal_law\">\n        <h1>Luật dự thảo</h1>\n        <blockquote>\n          {{ $('User Query').first().json.chatInput }}\n        </blockquote>\n      </div>\n      <div class=\"potential_conflict\">\n        <h1>Những mâu thuẫn tiềm tàng</h1>\n        <table>\n          <thead>\n            <tr>\n              <th>Câu hỏi</th>\n              <th>Suy diễn</th>\n            </tr>\n          </thead>\n          <tbody>\n            {{ $json.q2a_rows }}\n          </tbody>\n        </table>\n      </div>\n      <div class=\"answer_comparison\">\n        <h1>Suy diễn trên luật dự thảo và trên luật hiện hành</h1>\n        <h2>Bảng so sánh suy diễn trên luật dự thảo và trên luật hiện hành</h2>\n        <table>\n          <thead>\n            <tr>\n              <th>Câu hỏi</th>\n              <th>Có phạm quy không</th>\n              <th>Suy diễn trên luật dự thảo</th>\n              <th>Suy diễn trên luật hiện hành</th>\n              <th>Nguồn văn bản hiện hành</th>\n            </tr>\n          </thead>\n          <tbody>\n            {{ $json.answer_rows }}\n          </tbody>\n        </table>\n      </div>\n    </div>\n  </body>\n</html>\n\n<style>\n  .container {\n    background-color: #ffffff;\n    text-align: center;\n    padding: 16px;\n    border-radius: 8px;\n  }\n  \n  h1 {\n    color: #ff6d5a;\n    font-size: 24px;\n    font-weight: bold;\n    padding: 8px;\n  }\n  \n  h2 {\n    color: #909399;\n    font-size: 18px;\n    font-weight: bold;\n    padding: 8px;\n  }\n  \n  blockquote {\n    font-style: italic;\n    margin: 20px;\n    padding: 10px;\n    border-left: 2px solid #ccc;\n  }\n\n  table {\n    width: 100%;\n    border-collapse: collapse;\n  }\n\n  th, td {\n    border: 1px solid #ccc;\n    padding: 8px;\n    text-align: left;\n  }\n\n  th {\n    background-color: #f2f2f2;\n  }\n\n  tr:nth-child(even) {\n    background-color: #f9f9f9\n  }\n</style>"
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        4580,
+        940
+      ],
+      "id": "bcfd28ee-0192-4732-aee7-50ac9953d34e",
+      "name": "HTML"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        3680,
+        940
+      ],
+      "id": "f15b68cf-58ec-409c-b376-59c1b6f59cb7",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "// // Loop over input items and add a new field called 'myNewField' to the JSON of each one\n// for (const item of $input.all()) {\n//   item.json.myNewField = 1;\n// }\n\n// return $input.all();\nlet html_code = {\n  q2a_rows: \"\",\n  answer_rows: \"\"\n};\n\n// Loop over input items and add a new field called 'myNewField' to the JSON of each one\n$input.all().forEach(item => {\n  html_code.q2a_rows += `\n  <tr>\n    <td>${item.json.conflict_question}</td>\n    <td>${item.json.reason_behind_the_question}</td>\n  </tr>\n  `;\n\n  html_code.answer_rows += `\n  <tr>\n    <td>${item.json.conflict_question}</td>\n    <td>${item.json.potential_violation}</td>\n    <td>Answer: ${item.json.reason_on_proposal_law.answer}<br>Reason: ${item.json.reason_on_proposal_law.reason}</td>\n    <td>Answer: ${item.json.reason_on_official_law.answer}<br>Reason: ${item.json.reason_on_official_law.reason}</td>\n    <td>${item.json.reason_on_official_law.citation}</td>\n  </tr>\n  `;\n});\n\nreturn [html_code];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4300,
+        940
+      ],
+      "id": "481e52c9-676b-41f5-9784-c4f4a0d63c1e",
+      "name": "Export to HTML Code"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "html",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        4820,
+        940
+      ],
+      "id": "554db711-0682-4b2d-bc71-cc649a5ca447",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/data/experiments/trial.html",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        5040,
+        940
+      ],
+      "id": "2037e2e4-2ade-4b35-b327-6fce748de838",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "chatInput"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        780,
+        420
+      ],
+      "id": "430a4223-466c-455b-9c50-41168cbff02b",
+      "name": "User Query"
     }
   ],
   "pinData": {},
@@ -740,17 +781,6 @@
           {
             "node": "CoT Potential Conflicts Generation",
             "type": "ai_outputParser",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "User Query": {
-      "main": [
-        [
-          {
-            "node": "Retrieve From RAGFlow",
-            "type": "main",
             "index": 0
           }
         ]
@@ -868,17 +898,6 @@
           },
           {
             "node": "Auto-fixing Output Parser",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "OpenAI Chat Model": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "Self-Consistency",
             "type": "ai_languageModel",
             "index": 0
           }
@@ -1080,23 +1099,90 @@
           }
         ]
       ]
+    },
+    "Analyze Answers": {
+      "main": [
+        [
+          {
+            "node": "Export to HTML Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Analyze Answers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Export to HTML Code": {
+      "main": [
+        [
+          {
+            "node": "HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User Query": {
+      "main": [
+        [
+          {
+            "node": "Retrieve From RAGFlow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "a7f63cbb-3396-462c-aae9-d96062725869",
+  "versionId": "16b562ab-0c7b-46e3-9692-c5cb3ae5b806",
   "meta": {
+    "templateCredsSetupCompleted": true,
     "instanceId": "9cc5117b4c04f7253c095ebd1162db62020ea0a309fafa1019759775153c70a0"
   },
   "id": "bQLwuficblVoAaRk",
   "tags": [
     {
-      "createdAt": "2025-01-22T09:02:19.834Z",
-      "updatedAt": "2025-01-22T09:02:19.834Z",
-      "id": "8R6ppVVt4ceWVh97",
-      "name": "Experimental"
+      "createdAt": "2025-03-26T10:28:39.019Z",
+      "updatedAt": "2025-03-26T10:28:39.019Z",
+      "id": "GOxS9sI7Tfi9vKsA",
+      "name": "Product"
     },
     {
       "createdAt": "2025-01-22T09:01:37.382Z",
