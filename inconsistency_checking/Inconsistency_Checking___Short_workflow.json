@@ -58,7 +58,7 @@
       "credentials": {
         "httpHeaderAuth": {
           "id": "5IkKu0p5TGaZtLv7",
-          "name": "Header Auth account"
+          "name": "RAGFlow Authorization"
         }
       }
     },

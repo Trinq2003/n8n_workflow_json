@@ -58,7 +58,7 @@
       "credentials": {
         "httpHeaderAuth": {
           "id": "5IkKu0p5TGaZtLv7",
-          "name": "Header Auth account"
+          "name": "RAGFlow Authorization"
         }
       }
     },
@@ -550,7 +550,7 @@
       "credentials": {
         "httpHeaderAuth": {
           "id": "5IkKu0p5TGaZtLv7",
-          "name": "Header Auth account"
+          "name": "RAGFlow Authorization"
         }
       }
     },
@@ -658,24 +658,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3960,
+        3900,
         940
       ],
       "id": "1e43cb26-ad71-432a-9ba0-2a3add308d00",
       "name": "Analyze Answers"
-    },
-    {
-      "parameters": {
-        "html": "<!DOCTYPE html>\n\n<html>\n  <head>\n    <meta charset=\"UTF-8\" />\n    <title>Proposal Law Comments</title>\n  </head>\n  <body>\n    <div class=\"container\">\n      <div class=\"proposal_law\">\n        <h1>Luật dự thảo</h1>\n        <blockquote>\n          {{ $('User Query').first().json.chatInput }}\n        </blockquote>\n      </div>\n      <div class=\"potential_conflict\">\n        <h1>Những mâu thuẫn tiềm tàng</h1>\n        <table>\n          <thead>\n            <tr>\n              <th>Câu hỏi</th>\n              <th>Suy diễn</th>\n            </tr>\n          </thead>\n          <tbody>\n            {{ $json.q2a_rows }}\n          </tbody>\n        </table>\n      </div>\n      <div class=\"answer_comparison\">\n        <h1>Suy diễn trên luật dự thảo và trên luật hiện hành</h1>\n        <h2>Bảng so sánh suy diễn trên luật dự thảo và trên luật hiện hành</h2>\n        <table>\n          <thead>\n            <tr>\n              <th>Câu hỏi</th>\n              <th>Có phạm quy không</th>\n              <th>Suy diễn trên luật dự thảo</th>\n              <th>Suy diễn trên luật hiện hành</th>\n              <th>Nguồn văn bản hiện hành</th>\n            </tr>\n          </thead>\n          <tbody>\n            {{ $json.answer_rows }}\n          </tbody>\n        </table>\n      </div>\n    </div>\n  </body>\n</html>\n\n<style>\n  .container {\n    background-color: #ffffff;\n    text-align: center;\n    padding: 16px;\n    border-radius: 8px;\n  }\n  \n  h1 {\n    color: #ff6d5a;\n    font-size: 24px;\n    font-weight: bold;\n    padding: 8px;\n  }\n  \n  h2 {\n    color: #909399;\n    font-size: 18px;\n    font-weight: bold;\n    padding: 8px;\n  }\n  \n  blockquote {\n    font-style: italic;\n    margin: 20px;\n    padding: 10px;\n    border-left: 2px solid #ccc;\n  }\n\n  table {\n    width: 100%;\n    border-collapse: collapse;\n  }\n\n  th, td {\n    border: 1px solid #ccc;\n    padding: 8px;\n    text-align: left;\n  }\n\n  th {\n    background-color: #f2f2f2;\n  }\n\n  tr:nth-child(even) {\n    background-color: #f9f9f9\n  }\n</style>"
-      },
-      "type": "n8n-nodes-base.html",
-      "typeVersion": 1.2,
-      "position": [
-        4580,
-        940
-      ],
-      "id": "bcfd28ee-0192-4732-aee7-50ac9953d34e",
-      "name": "HTML"
     },
     {
       "parameters": {},
@@ -695,41 +682,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        4300,
+        4120,
         940
       ],
       "id": "481e52c9-676b-41f5-9784-c4f4a0d63c1e",
       "name": "Export to HTML Code"
-    },
-    {
-      "parameters": {
-        "operation": "toText",
-        "sourceProperty": "html",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.convertToFile",
-      "typeVersion": 1.1,
-      "position": [
-        4820,
-        940
-      ],
-      "id": "554db711-0682-4b2d-bc71-cc649a5ca447",
-      "name": "Convert to File"
-    },
-    {
-      "parameters": {
-        "operation": "write",
-        "fileName": "/data/experiments/trial.html",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.readWriteFile",
-      "typeVersion": 1,
-      "position": [
-        5040,
-        940
-      ],
-      "id": "2037e2e4-2ade-4b35-b327-6fce748de838",
-      "name": "Read/Write Files from Disk"
     },
     {
       "parameters": {
@@ -749,6 +706,19 @@
       ],
       "id": "430a4223-466c-455b-9c50-41168cbff02b",
       "name": "User Query"
+    },
+    {
+      "parameters": {
+        "html": "<!DOCTYPE html>\n\n<html>\n  <head>\n    <meta charset=\"UTF-8\" />\n    <title>Proposal Law Detailed Comments</title>\n  </head>\n  <body>\n    <div class=\"container\">\n      <div class=\"proposal_law\">\n        <h1>Luật dự thảo</h1>\n        <blockquote>\n          {{ $('User Query').first().json.chatInput }}\n        </blockquote>\n      </div>\n      <div class=\"potential_conflict\">\n        <h1>Những mâu thuẫn tiềm tàng</h1>\n        <table>\n          <thead>\n            <tr>\n              <th>Câu hỏi</th>\n              <th>Suy diễn</th>\n            </tr>\n          </thead>\n          <tbody>\n            {{ $json.q2a_rows }}\n          </tbody>\n        </table>\n      </div>\n      <div class=\"answer_comparison\">\n        <h1>Suy diễn trên luật dự thảo và trên luật hiện hành</h1>\n        <h2>Bảng so sánh suy diễn trên luật dự thảo và trên luật hiện hành</h2>\n        <table>\n          <thead>\n            <tr>\n              <th>Câu hỏi</th>\n              <th>Có phạm quy không</th>\n              <th>Suy diễn trên luật dự thảo</th>\n              <th>Suy diễn trên luật hiện hành</th>\n              <th>Nguồn văn bản hiện hành</th>\n            </tr>\n          </thead>\n          <tbody>\n            {{ $json.answer_rows }}\n          </tbody>\n        </table>\n      </div>\n    </div>\n  </body>\n</html>\n\n<style>\n  .container {\n    background-color: #ffffff;\n    text-align: center;\n    padding: 16px;\n    border-radius: 8px;\n  }\n  \n  h1 {\n    color: #ff6d5a;\n    font-size: 24px;\n    font-weight: bold;\n    padding: 8px;\n  }\n  \n  h2 {\n    color: #909399;\n    font-size: 18px;\n    font-weight: bold;\n    padding: 8px;\n  }\n  \n  blockquote {\n    font-style: italic;\n    margin: 20px;\n    padding: 10px;\n    border-left: 2px solid #ccc;\n  }\n\n  table {\n    width: 100%;\n    border-collapse: collapse;\n  }\n\n  th, td {\n    border: 1px solid #ccc;\n    padding: 8px;\n    text-align: left;\n  }\n\n  th {\n    background-color: #f2f2f2;\n  }\n\n  tr:nth-child(even) {\n    background-color: #f9f9f9\n  }\n</style>"
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        4360,
+        940
+      ],
+      "id": "bcfd28ee-0192-4732-aee7-50ac9953d34e",
+      "name": "Detailed Logs HTML"
     }
   ],
   "pinData": {},
@@ -1126,29 +1096,7 @@
       "main": [
         [
           {
-            "node": "HTML",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "HTML": {
-      "main": [
-        [
-          {
-            "node": "Convert to File",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Convert to File": {
-      "main": [
-        [
-          {
-            "node": "Read/Write Files from Disk",
+            "node": "Detailed Logs HTML",
             "type": "main",
             "index": 0
           }
@@ -1165,13 +1113,18 @@
           }
         ]
       ]
+    },
+    "Detailed Logs HTML": {
+      "main": [
+        []
+      ]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "16b562ab-0c7b-46e3-9692-c5cb3ae5b806",
+  "versionId": "bce2a867-f525-41db-a4d2-e71dd10fcf5d",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "9cc5117b4c04f7253c095ebd1162db62020ea0a309fafa1019759775153c70a0"
@@ -1180,9 +1133,15 @@
   "tags": [
     {
       "createdAt": "2025-03-26T10:28:39.019Z",
-      "updatedAt": "2025-03-26T10:28:39.019Z",
+      "updatedAt": "2025-04-12T08:33:54.226Z",
       "id": "GOxS9sI7Tfi9vKsA",
-      "name": "Product"
+      "name": "Published"
+    },
+    {
+      "createdAt": "2025-01-22T09:01:33.605Z",
+      "updatedAt": "2025-01-22T09:01:33.605Z",
+      "id": "UOdsOs30R1Ajojas",
+      "name": "Verion 1"
     },
     {
       "createdAt": "2025-01-22T09:01:37.382Z",

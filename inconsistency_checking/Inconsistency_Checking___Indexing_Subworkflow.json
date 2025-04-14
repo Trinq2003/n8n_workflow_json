@@ -1,0 +1,422 @@
+{
+  "name": "Inconsistency Checking | Indexing Subworkflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "285efe08-45af-41f7-8b2f-4589b3cce390",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        -40
+      ],
+      "id": "21620c68-7de5-41d5-b629-cee3947d3179",
+      "name": "Upload File",
+      "webhookId": "285efe08-45af-41f7-8b2f-4589b3cce390"
+    },
+    {
+      "parameters": {
+        "jsCode": "var fileExtension = $input.item.binary.data.fileExtension;\nif (fileExtension===\"markdown\") {fileExtension = 'md';}\n$input.item.binary.data.fileName += \".\"+fileExtension;\n\nreturn $input.item;\n// return {'a': fileExtension}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        -40
+      ],
+      "id": "28eaedc6-bb01-4621-9b07-9b3048bdd9ff",
+      "name": "Change Filename"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.207.163.17:80/api/v1/datasets/b08b7090167e11f0a6de0242c0a8a006/documents",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "multipart/form-data"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        80,
+        -40
+      ],
+      "id": "7b4ec01b-38db-4cf6-a8f5-e51c1283f4fd",
+      "name": "Upload File to RAGFlow",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "5IkKu0p5TGaZtLv7",
+          "name": "RAGFlow Authorization"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.207.163.17:80/api/v1/datasets/b08b7090167e11f0a6de0242c0a8a006/chunks",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "document_ids",
+              "value": "={{ $json.data.map(item=>item.id) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -160,
+        200
+      ],
+      "id": "c68d5842-6e72-4fa6-9f49-0ddeb13e0a48",
+      "name": "Start File Index",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "5IkKu0p5TGaZtLv7",
+          "name": "RAGFlow Authorization"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "http://10.207.163.17:80/api/v1/datasets/b08b7090167e11f0a6de0242c0a8a006/documents",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "page_size",
+              "value": "1"
+            },
+            {
+              "name": "id",
+              "value": "={{ $('Wait for Upload').item.json.data[0].id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        80,
+        200
+      ],
+      "id": "6911d487-54a1-4b7f-9bd5-76df84829a5b",
+      "name": "Get Indexing Progress",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "5IkKu0p5TGaZtLv7",
+          "name": "RAGFlow Authorization"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a1977142-d9c8-42f4-9d0f-e7e2e4b77be3",
+              "leftValue": "={{ $json.data.docs[0].progress }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        300,
+        200
+      ],
+      "id": "943e7ef7-4d46-4f52-9a4d-f23b22d7c35e",
+      "name": "If Done Indexing"
+    },
+    {
+      "parameters": {
+        "url": "=http://10.207.163.17:80/api/v1/datasets/b08b7090167e11f0a6de0242c0a8a006/documents/{{ $('Upload File to RAGFlow').first().json.data[0].id }}/chunks",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "page_size",
+              "value": "500"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        540,
+        40
+      ],
+      "id": "1f1de7db-4161-41f5-9b1d-9f10c55a5c41",
+      "name": "Get List of Chunks",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "5IkKu0p5TGaZtLv7",
+          "name": "RAGFlow Authorization"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -400,
+        200
+      ],
+      "id": "e44e01fc-4a93-4732-b27d-a1df3f9458ad",
+      "name": "Wait for Upload",
+      "webhookId": "5fedaba0-d6fe-44fd-8862-42dd21426557"
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        520,
+        400
+      ],
+      "id": "6d4f837e-0168-4105-93fa-64cf30c9cc69",
+      "name": "Wait for Indexing",
+      "webhookId": "c9eac393-bfdf-4d13-87b1-417b924ef73f"
+    },
+    {
+      "parameters": {
+        "jsCode": "return {'list_of_chunks': $input.first().json.data.chunks.map(item=>item.content)};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        40
+      ],
+      "id": "c6285b02-efa2-4d24-b455-0b1bdfc76d40",
+      "name": "Return Chunk Contents"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        980,
+        40
+      ],
+      "id": "0a1c76cb-a6fe-4ba0-87e4-37db8299bd73",
+      "name": "Respond to Upload File"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Upload File": {
+      "main": [
+        [
+          {
+            "node": "Change Filename",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Change Filename": {
+      "main": [
+        [
+          {
+            "node": "Upload File to RAGFlow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload File to RAGFlow": {
+      "main": [
+        [
+          {
+            "node": "Wait for Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start File Index": {
+      "main": [
+        [
+          {
+            "node": "Get Indexing Progress",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Indexing Progress": {
+      "main": [
+        [
+          {
+            "node": "If Done Indexing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Done Indexing": {
+      "main": [
+        [
+          {
+            "node": "Get List of Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait for Indexing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Upload": {
+      "main": [
+        [
+          {
+            "node": "Start File Index",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Indexing": {
+      "main": [
+        [
+          {
+            "node": "Get Indexing Progress",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get List of Chunks": {
+      "main": [
+        [
+          {
+            "node": "Return Chunk Contents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Chunk Contents": {
+      "main": [
+        [
+          {
+            "node": "Respond to Upload File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2b0dbb47-ff32-4846-b63d-2cd0b6cc7f79",
+  "meta": {
+    "instanceId": "9cc5117b4c04f7253c095ebd1162db62020ea0a309fafa1019759775153c70a0"
+  },
+  "id": "Vtyu6Ouz70KQCWiw",
+  "tags": [
+    {
+      "createdAt": "2025-03-26T10:28:39.019Z",
+      "updatedAt": "2025-04-12T08:33:54.226Z",
+      "id": "GOxS9sI7Tfi9vKsA",
+      "name": "Published"
+    },
+    {
+      "createdAt": "2025-01-22T09:01:33.605Z",
+      "updatedAt": "2025-01-22T09:01:33.605Z",
+      "id": "UOdsOs30R1Ajojas",
+      "name": "Verion 1"
+    },
+    {
+      "createdAt": "2025-01-22T09:01:37.382Z",
+      "updatedAt": "2025-04-08T02:58:44.060Z",
+      "id": "zFOTM2BMc7jSWLpy",
+      "name": "TriNQ"
+    }
+  ]
+}
