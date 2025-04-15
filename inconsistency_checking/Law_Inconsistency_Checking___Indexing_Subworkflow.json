@@ -1,0 +1,380 @@
+{
+  "name": "Law Inconsistency Checking | Indexing Subworkflow",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "var fileExtension = $input.item.binary.data.fileExtension;\nif (fileExtension===\"markdown\") {fileExtension = 'md';}\n$input.item.binary.data.fileName += \".\"+fileExtension;\n\nreturn $input.item;\n// return {'a': fileExtension}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        140,
+        -40
+      ],
+      "id": "93acea10-cf20-4f93-92e1-daa538d11b48",
+      "name": "Change Filename"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://172.17.0.1:180/api/v1/datasets/d97cf754190711f0b3383e5d6b430480/documents",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "multipart/form-data"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        380,
+        -40
+      ],
+      "id": "ab7e7de2-2b5d-45bc-bf91-88730ecf1a05",
+      "name": "Upload File to RAGFlow",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "v1yskh1LvTPwyPMf",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://172.17.0.1:180/api/v1/datasets/d97cf754190711f0b3383e5d6b430480/chunks",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "document_ids",
+              "value": "={{ $json.data.map(item=>item.id) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        140,
+        200
+      ],
+      "id": "d1936afc-b3cf-4921-a229-c78d87b71399",
+      "name": "Start File Index",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "v1yskh1LvTPwyPMf",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "http://172.17.0.1:180/api/v1/datasets/d97cf754190711f0b3383e5d6b430480/documents",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "page_size",
+              "value": "1"
+            },
+            {
+              "name": "id",
+              "value": "={{ $('Wait for Upload').item.json.data[0].id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        380,
+        200
+      ],
+      "id": "0513e509-1fd9-4eee-9197-f245eccdcb81",
+      "name": "Get Indexing Progress",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "v1yskh1LvTPwyPMf",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a1977142-d9c8-42f4-9d0f-e7e2e4b77be3",
+              "leftValue": "={{ $json.data.docs[0].progress }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        600,
+        200
+      ],
+      "id": "6b656dc3-8d34-4831-9e97-79509499d54b",
+      "name": "If Done Indexing"
+    },
+    {
+      "parameters": {
+        "url": "=http://172.17.0.1:180/api/v1/datasets/d97cf754190711f0b3383e5d6b430480/documents/{{ $('Upload File to RAGFlow').first().json.data[0].id }}/chunks",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "page_size",
+              "value": "500"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        840,
+        40
+      ],
+      "id": "6b723089-7b92-4d8c-ac17-94c3c8b7c513",
+      "name": "Get List of Chunks",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "v1yskh1LvTPwyPMf",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -100,
+        200
+      ],
+      "id": "0baa7e7e-5ac9-4af6-af36-84f61b7b9757",
+      "name": "Wait for Upload",
+      "webhookId": "5fedaba0-d6fe-44fd-8862-42dd21426557"
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        820,
+        400
+      ],
+      "id": "a06848f8-9599-4d6e-afe5-6aba3d17dd71",
+      "name": "Wait for Indexing",
+      "webhookId": "c9eac393-bfdf-4d13-87b1-417b924ef73f"
+    },
+    {
+      "parameters": {
+        "jsCode": "return {'list_of_chunks': $input.first().json.data.chunks.map(item=>item.content)};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1060,
+        40
+      ],
+      "id": "33249c07-63dd-4d0e-98d3-d352d70c9231",
+      "name": "Return Chunk Contents"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -380,
+        -40
+      ],
+      "id": "b563abd9-efd5-404f-9724-f551ffc5d70e",
+      "name": "File Input From Another Workflow"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Change Filename": {
+      "main": [
+        [
+          {
+            "node": "Upload File to RAGFlow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload File to RAGFlow": {
+      "main": [
+        [
+          {
+            "node": "Wait for Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start File Index": {
+      "main": [
+        [
+          {
+            "node": "Get Indexing Progress",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Indexing Progress": {
+      "main": [
+        [
+          {
+            "node": "If Done Indexing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Done Indexing": {
+      "main": [
+        [
+          {
+            "node": "Get List of Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait for Indexing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Upload": {
+      "main": [
+        [
+          {
+            "node": "Start File Index",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Indexing": {
+      "main": [
+        [
+          {
+            "node": "Get Indexing Progress",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get List of Chunks": {
+      "main": [
+        [
+          {
+            "node": "Return Chunk Contents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Chunk Contents": {
+      "main": [
+        []
+      ]
+    },
+    "File Input From Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Change Filename",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "8f4c914e-5ed3-4943-9d6e-a525d8caaa9b",
+  "meta": {
+    "instanceId": "f75a8e70ea2778b34279bc302d4c7d3e2f1db8ecda945851eb32c430c7dee3f7"
+  },
+  "id": "cjYy7fCBEseVa0KW",
+  "tags": []
+}
