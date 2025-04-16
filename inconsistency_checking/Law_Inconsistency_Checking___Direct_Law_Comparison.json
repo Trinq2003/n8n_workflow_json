@@ -1,0 +1,634 @@
+{
+  "name": "Law Inconsistency Checking | Direct Law Comparison",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.48.1:8000/api/v1/retrieval",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "question",
+              "value": "={{ $json.chatInput }}"
+            },
+            {
+              "name": "dataset_ids",
+              "value": "={{ ['14aad2b6168c11f0bc810242c0a8e007'] }}"
+            },
+            {
+              "name": "similarity_threshold",
+              "value": "0.2"
+            },
+            {
+              "name": "vector_similarity_weight",
+              "value": "0.5"
+            },
+            {
+              "name": "top_k",
+              "value": "10"
+            },
+            {
+              "name": "page_size",
+              "value": "10"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bd9d0c5a-68c6-4640-b79e-258efd5b7353",
+      "name": "Retrieve From RAGFlow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        -540
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "BsiYDBYhVfKwEyaP",
+          "name": "RAGFlow Authentication"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "var related_chunks = [];\nfor (let i=0; i<$input.all().length; i++) {\n  if ($input.all()[i].json.text === \"related\") {\n    chunk = $('Retrieve From RAGFlow').all()[0].json.data.chunks[i];\n    related_chunks.push(\n      {\n        'dataset_id': chunk.dataset_id,\n        'document_id': chunk.document_id,\n        'chunk_id': chunk.id,\n        'keywords': chunk.important_keywords,\n        'content': chunk.content\n      }\n    );\n  } \n}\n\nreturn related_chunks;"
+      },
+      "id": "860c8f50-5d83-4b22-8893-105c757564a2",
+      "name": "Filter Retrieved Chunks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        -380
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "numberOfItems": 10,
+          "separator": "\\n"
+        }
+      },
+      "id": "0926ee54-05ca-4fe2-bc38-82de9be84a42",
+      "name": "Retrieval Decide",
+      "type": "@n8n/n8n-nodes-langchain.outputParserItemList",
+      "typeVersion": 1,
+      "position": [
+        640,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<query>\n{{ $('User Query').item.json.chatInput }}\n</query>\n\n<context>\nNumber of items: {{ $json.data.chunks.length }}\n{{ $json.data.chunks.map((item, index) => `Item ${index+1}.\\n=========\\n ${item.content}\\n=========\\n`).join(\"\\n\") }}\n</context>",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=As an expert Vietnamese lawyer, your task is to determine which law applies to a specific query. You need to ensure that the laws you consider are consistent.\n<instruction>\nYou will be provided with a query and a list of five relevant contexts (all written in Vietnamese). Carefully read through each context and decide whether it is directly relevant to the query.\n</instruction>\n<output>\nYour output should indicate \"related\" or \"unrelated\" for each context, with each response on a separate line. The number of line MUST match the number of official laws.\n</output>\n"
+            },
+            {
+              "type": "HumanMessagePromptTemplate",
+              "message": "=<query>\nTrường hợp ngang nhau thì bên có ý kiến của Chủ tịch Hội sẽ được chấp thuận. 3. Ban Chấp hành có nhiệm vụ và quyền hạn sau đây: a) Quyết định các biện pháp thực hiện nghị quyết, chương trình hoạt động trong nhiệm kỳ của Đại hội; b) Quyết định chương trình, kế hoạch công tác hàng năm hoặc giữa các kỳ họp của Ban Chấp hành; c) Thông qua kế hoạch và quyết toán tài chính nhiệm kỳ và hàng năm của Hội;\n</query>\n\n<context>\n1. V. Hồ sơ, gồm: Điều 14. Ban Chấp hành Hội (hoặc tên gọi khác) 3. Nguyên tắc hoạt động của Ban Chấp hành: d) Các nghị quyết, quyết định của Ban Chấp hành được thông qua khi có trên ... tổng số ủy viên Ban Chấp hành dự họp biểu quyết tán thành. Trong trường hợp số ý kiến tán thành và không tán thành ngang nhau thì quyết định thuộc về bên có ý kiến của Chủ tịch Hội. Điều 15. Ban Thường vụ Hội (hoặc tên gọi khác) 1. Ban Thường vụ Hội do Ban Chấp hành bầu trong số các ủy viên Ban Chấp hành; Ban Thường vụ Hội gồm: Chủ tịch, các Phó Chủ tịch và các ủy viên. Số lượng, cơ cấu, tiêu chuẩn ủy viên Ban Thường vụ do Ban Chấp hành quyết định. Nhiệm kỳ của Ban Thường vụ cùng với nhiệm kỳ Đại hội. 2. Nhiệm vụ và quyền hạn của Ban Thuờng vụ:\n\n\n2. Điều 13. Ban Chấp hành Trung ương Hội 2. Ban Chấp hành hoạt động theo Quy chế và Điều lệ Hội. Ban Chấp hành họp thường kỳ mỗi năm một lần; khi cần thiết có thể họp bất thường. Các quyết định, nghị quyết của Ban Chấp hành được thông qua và có hiệu lực khi có trên 50% tổng số ủy viên chính thức dự họp tán thành. Trường hợp ngang nhau thì bên có ý kiến của Chủ tịch Hội sẽ được chấp thuận. 3. Ban Chấp hành có nhiệm vụ và quyền hạn sau đây: a) Quyết định các biện pháp thực hiện nghị quyết, chương trình hoạt động trong nhiệm kỳ của Đại hội; b) Quyết định chương trình, kế hoạch công tác hàng năm hoặc giữa các kỳ họp của Ban Chấp hành; c) Thông qua kế hoạch và quyết toán tài chính nhiệm kỳ và hàng năm của Hội;\n\n\n3. Điều 14. Ban Chấp hành Hội 4. Nguyên tắc hoạt động của Ban Chấp hành: d) Các nghị quyết, quyết định của Ban Chấp hành được thông qua khi có trên 1/2 (một phần hai) tổng số ủy viên Ban Chấp hành tham gia dự họp biểu quyết tán thành. Trường hợp số ý kiến tán thành và không tán thành ngang nhau thì quyết định thuộc về bên có ý kiến của Chủ tịch Hội. Điều 15. Ban Thường vụ Hội 1. Ban Thường vụ Hội do Ban Chấp hành bầu trong số các ủy viên Ban Chấp hành; Ban Thường vụ Hội gồm: Chủ tịch, các Phó Chủ tịch, Tổng thư ký và các ủy viên. Số lượng, cơ cấu, tiêu chuẩn ủy viên Ban Thường vụ do Ban Chấp hành Hội quyết định. Nhiệm kỳ của Ban Thường vụ cùng với nhiệm kỳ Đại hội. 2. Nhiệm vụ, quyền hạn của Ban Thường vụ:\n\n\n4. V. Hồ sơ, gồm: Điều 14. Ban Chấp hành Hội (hoặc tên gọi khác) 3. Nguyên tắc hoạt động của Ban Chấp hành: d) Các nghị quyết, quyết định của Ban Chấp hành được thông qua khi có trên ... tổng số ủy viên Ban Chấp hành dự họp biểu quyết tán thành. Trong trường hợp số ý kiến tán thành và không tán thành ngang nhau thi quyết định thuộc về bên có ý kiến của Chủ tịch Hội. Điều 15. Ban Thường vụ Hội (hoặc tên gọi khác) 1- Ban Thường vụ Hội do Ban Chấp hành bầu trong số các ủy viên Ban Chấp hành; Ban Thường vụ Hội gồm: Chủ tịch, các Phó Chủ tịch và các ủy viên, số lượng, cơ cấu, tiêu chuẩn ủy viên Ban Thường vụ do Ban Chấp hành quyết định. Nhiệm kỳ của Ban Thường vụ cùng với nhiệm kỳ Đại hội. 2. Nhiệm vụ và quyền hạn của Ban Thường vụ:\n\n\n5. Điều 14. Ban Chấp hành Hội 4. Nguyên tắc hoạt động của Ban Chấp hành: b) Các cuộc họp của Ban Chấp hành được xem là hợp lệ khi có 2/3 (hai phần ba) số lượng ủy viên Ban Chấp hành tham gia dự họp. Ban Chấp hành biểu quyết theo nguyên tắc quá bán, thiểu số phục tùng đa số. Trong trường hợp biểu quyết ngang nhau thì quyết định thuộc về bên có ý kiến của Chủ tịch Hội hoặc người chủ trì hội nghị. Ban Chấp hành có thể biểu quyết bằng hình thức giơ tay hoặc bỏ phiếu kín. Việc quy định hình thức biểu quyết họp Ban Chấp hành do Ban Chấp hành Hội quyết định; c) Giữa hai kỳ họp Ban Chấp hành để quyết định các vấn đề thuộc thẩm quyền của Ban Chấp hành có thể hội ý, thảo luận, thông qua lấy ý kiến bằng văn bản;\n</context>"
+            },
+            {
+              "type": "AIMessagePromptTemplate",
+              "message": "=related\nunrelated\nrelated\nrelated\nunrelated"
+            }
+          ]
+        }
+      },
+      "id": "183c0bf9-6f87-4b5b-bcf3-55628a41d61d",
+      "name": "Decide Relevant Content",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        460,
+        -380
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"potential_conflict\": {\n\t\t\t\"type\": \"string\"\n\t\t},\n\t\t\"reason\": {\n\t\t\t\"type\": \"string\"\n\t\t}\n\t}\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        1380,
+        280
+      ],
+      "id": "7191775e-d654-4b0b-9401-06bea8828946",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<proposal_law>\n{{ $('User Query').first().json.chatInput }}\n</proposal_law>\n\n<official_law>\n{{ $json.content }}\n</official_law>",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=<instruction>\nAs an expert Vietnamese lawyer, your task is to check for any conflict between a proposal law and an official law.\n\nYou will be provided an input of the following form:\n```\n<proposal_law>\n# The proposal law will be given here, written in Vietnamese\n</proposal_law>\n\n<official_law>\n# A related official law will be given here, written in Vietnamese\n</official_law>\n```\n<\\instruction>\n\n<output>\nYour task is to reason and decide if any conflict can happen with the proposal law. You will output a JSON with the format given below:\n```json\n[\n  {\n    \"potential_conflict\": \"Write the potential conflict clearly and concisely in Vietnamese\",\n    \"reason\": \"The reason why the conflict may happen in Vietnamese\"\n  }\n]\n```\n<\\output>"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.6,
+      "position": [
+        1120,
+        -180
+      ],
+      "id": "92765d0b-7328-4cea-98ad-ff90a241a345",
+      "name": "Law Consistency Checker"
+    },
+    {
+      "parameters": {
+        "html": "<!DOCTYPE html>\n\n<html>\n<head>\n  <meta charset=\"UTF-8\" />\n  <title>Proposal Law Fast Comparison</title>\n</head>\n<body>\n  <div class=\"container\">\n    <div class=\"proposal_law\">\n      <h1>Luật dự thảo</h1>\n      <blockquote>\n        {{ $('User Query').first().json.chatInput }}\n      </blockquote>\n    </div>\n    <div>\n      <h1>So sánh trực tiếp</h1>\n      <table>\n        <thead>\n          <tr>\n            <th>Luật hiện hành</th>\n            <th>Mâu thuẫn với luạt dự thảo</th>\n            <th>Phân tích mâu thuẫn</th>\n          </tr>\n        </thead>\n        <tbody>\n          {{ $json.analyze }}\n        </tbody>\n      </table>\n    </div>\n  </div>\n</body>\n</html>\n\n<style>\n  .container {\n    background-color: #ffffff;\n    text-align: center;\n    padding: 16px;\n    border-radius: 8px;\n  }\n  \n  h1 {\n    color: #ff6d5a;\n    font-size: 24px;\n    font-weight: bold;\n    padding: 8px;\n  }\n  \n  h2 {\n    color: #909399;\n    font-size: 18px;\n    font-weight: bold;\n    padding: 8px;\n  }\n  \n  blockquote {\n    font-style: italic;\n    margin: 20px;\n    padding: 10px;\n    border-left: 2px solid #ccc;\n  }\n\n  table {\n    width: 100%;\n    border-collapse: collapse;\n  }\n\n  th, td {\n    border: 1px solid #ccc;\n    padding: 8px;\n    text-align: left;\n  }\n\n  th {\n    background-color: #f2f2f2;\n  }\n\n  tr:nth-child(even) {\n    background-color: #f9f9f9\n  }\n</style>"
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        2260,
+        -180
+      ],
+      "id": "56d60be1-ff18-491e-a47c-ff674a79e8aa",
+      "name": "HTML"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserAutofixing",
+      "typeVersion": 1,
+      "position": [
+        1180,
+        60
+      ],
+      "id": "02e103fa-89c1-4737-ab0a-335532ea73d6",
+      "name": "Auto-fixing Output Parser"
+    },
+    {
+      "parameters": {
+        "jsCode": "const list_of_official_laws = $('Filter Retrieved Chunks').all().map(item=>item.json.content);\nconst list_of_conflict_and_reason = $('Law Consistency Checker').all().map(item=>item.json.output);\nvar list_of_law_comparison = [];\nfor (let i=0; i<list_of_official_laws.length; i++) {\n  list_of_law_comparison.push(\n    {\n      'official_law': list_of_official_laws[i],\n      'potential_conflict': list_of_conflict_and_reason[i].potential_conflict,\n      'reason': list_of_conflict_and_reason[i].reason\n    }\n  );\n}\n\nreturn list_of_law_comparison;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        -180
+      ],
+      "id": "36d71a36-d8a0-4a18-83b3-42cec0f40128",
+      "name": "Analyze Answers"
+    },
+    {
+      "parameters": {
+        "jsCode": "let html_code = {\n  analyze: \"\"\n};\n\n$input.all().forEach(item => {\n  html_code.analyze += `\n  <tr>\n    <td>${item.json.official_law}</td>\n    <td>${item.json.potential_conflict}</td>\n    <td>${item.json.reason}</td>\n  </tr>\n  `\n  }\n);\n\nreturn [html_code];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        -180
+      ],
+      "id": "e3158655-b6b5-4326-affc-112b6727d62a",
+      "name": "Convert to HTML"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "chatInput"
+            },
+            {
+              "name": "fileId"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        60,
+        -540
+      ],
+      "id": "cde95150-d91a-405d-833b-9ddea7ed4bf8",
+      "name": "User Query"
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAzureOpenAi",
+      "typeVersion": 1,
+      "position": [
+        460,
+        100
+      ],
+      "id": "0dec0ce7-b764-4dc6-8bb4-061ced3edf6d",
+      "name": "Azure OpenAI Chat Model",
+      "credentials": {
+        "azureOpenAiApi": {
+          "id": "p5bVBgiTCxkJYV1Z",
+          "name": "Azure Open AI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  \"retrieved_chunks\": $input.first().json.data.chunks,\n  \"file_id\": $(\"User Query\").first().json.fileId,\n  \"timestamp\": new Date().toLocaleString()\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        -660
+      ],
+      "id": "618539c8-4b02-4f33-b2f5-2ad5cd0a09b5",
+      "name": "Retrieved Chunk Info"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "collection": "direct_comparison_log",
+        "fields": "retrieved_chunks, file_id, timestamp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.1,
+      "position": [
+        680,
+        -660
+      ],
+      "id": "96fc8472-8798-435c-b3c6-d4d25bc3e745",
+      "name": "Log Retrieved Chunks",
+      "credentials": {
+        "mongoDb": {
+          "id": "5hgD3RXb78qYUD3q",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "var list_of_filtered_chunks = []\nfor (const chunk of $input.all()) {\n  list_of_filtered_chunks.push(\n    {\n      \"chunk_id\": chunk.json.chunk_id,\n      \"chunk_content\": chunk.json.content,\n    }\n  )\n}\n\nreturn {\n\"filtered_chunks\": list_of_filtered_chunks,\n\"file_id\": $(\"User Query\").first().json.fileId,\n\"timestamp\": new Date().toLocaleString()\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        -560
+      ],
+      "id": "d8a29adb-d361-4c99-ba38-2f79870b166f",
+      "name": "Filtered Chunks Info"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "collection": "direct_comparison_log",
+        "fields": "filtered_chunks, file_id, timestamp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.1,
+      "position": [
+        1340,
+        -560
+      ],
+      "id": "10dc40d3-5d47-4540-85bc-e47e4fd738ca",
+      "name": "Log Filtered Chunks",
+      "credentials": {
+        "mongoDb": {
+          "id": "5hgD3RXb78qYUD3q",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  \"answer_analyzing\": $input.all().map(item=>item.json),\n  \"file_id\": $(\"User Query\").first().json.fileId,\n  \"timestamp\": new Date().toLocaleString()\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        -400
+      ],
+      "id": "ee7f979b-33be-4dc5-a0ec-aa6b54e81c00",
+      "name": "Answer Analyzing Info"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "collection": "direct_comparison_log",
+        "fields": "answer_analyzing, file_id, timestamp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.1,
+      "position": [
+        2060,
+        -400
+      ],
+      "id": "f56bd091-39b6-4bfb-9fd4-8daf4c925777",
+      "name": "Log Answer Analyzing",
+      "credentials": {
+        "mongoDb": {
+          "id": "5hgD3RXb78qYUD3q",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch",
+        "numberInputs": 4,
+        "useDataOfInput": 4
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        2560,
+        -640
+      ],
+      "id": "94856998-da6e-4d55-bdbc-01551b1d7cac",
+      "name": "Return"
+    }
+  ],
+  "pinData": {
+    "User Query": [
+      {
+        "json": {
+          "chatInput": "Đất lâm nghiệp được quy định là đất bao gồm nhà cửa",
+          "fileId": "123456789"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Retrieve From RAGFlow": {
+      "main": [
+        [
+          {
+            "node": "Decide Relevant Content",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Retrieved Chunk Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Retrieved Chunks": {
+      "main": [
+        [
+          {
+            "node": "Law Consistency Checker",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Filtered Chunks Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieval Decide": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Decide Relevant Content",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide Relevant Content": {
+      "main": [
+        [
+          {
+            "node": "Filter Retrieved Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Auto-fixing Output Parser",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Law Consistency Checker": {
+      "main": [
+        [
+          {
+            "node": "Analyze Answers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto-fixing Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Law Consistency Checker",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Answers": {
+      "main": [
+        [
+          {
+            "node": "Convert to HTML",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Answer Analyzing Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to HTML": {
+      "main": [
+        [
+          {
+            "node": "HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User Query": {
+      "main": [
+        [
+          {
+            "node": "Retrieve From RAGFlow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Azure OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Decide Relevant Content",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Law Consistency Checker",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Auto-fixing Output Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieved Chunk Info": {
+      "main": [
+        [
+          {
+            "node": "Log Retrieved Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtered Chunks Info": {
+      "main": [
+        [
+          {
+            "node": "Log Filtered Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer Analyzing Info": {
+      "main": [
+        [
+          {
+            "node": "Log Answer Analyzing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Retrieved Chunks": {
+      "main": [
+        [
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Filtered Chunks": {
+      "main": [
+        [
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Log Answer Analyzing": {
+      "main": [
+        [
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "HTML": {
+      "main": [
+        [
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "4dafcecb-f307-4f75-8cc0-aee38a5cab92",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d8c8372ef7a659c4f0fd0d493f164dce23076499176f8e625c9ee5f99c7551e5"
+  },
+  "id": "8k1DGYxmlbur5rwm",
+  "tags": [
+    {
+      "createdAt": "2025-04-14T09:30:46.031Z",
+      "updatedAt": "2025-04-14T09:30:46.031Z",
+      "id": "8J6ldlcSlbTT8IXk",
+      "name": "Trinq"
+    },
+    {
+      "createdAt": "2025-04-14T09:30:52.291Z",
+      "updatedAt": "2025-04-14T09:30:52.291Z",
+      "id": "kpNxjymercZpqEZB",
+      "name": "Published"
+    }
+  ]
+}
