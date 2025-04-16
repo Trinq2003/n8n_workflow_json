@@ -1,0 +1,1575 @@
+{
+  "name": "Law Inconsistency Checking | Detailed Logs",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.48.1:8000/api/v1/retrieval",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "question",
+              "value": "={{ $json.chatInput }}"
+            },
+            {
+              "name": "dataset_ids",
+              "value": "={{ ['14aad2b6168c11f0bc810242c0a8e007'] }}"
+            },
+            {
+              "name": "similarity_threshold",
+              "value": "0.2"
+            },
+            {
+              "name": "vector_similarity_weight",
+              "value": "0.5"
+            },
+            {
+              "name": "top_k",
+              "value": "10"
+            },
+            {
+              "name": "page_size",
+              "value": "5"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0c5f52f4-5cb5-41a7-b187-991949583e21",
+      "name": "Retrieve From RAGFlow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -3540,
+        20
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "BsiYDBYhVfKwEyaP",
+          "name": "RAGFlow Authentication"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "var related_chunks = [];\nfor (let i=0; i<$('Retrieve From RAGFlow').first().json.data.chunks.length; i++) {\n  let chunk =$('Retrieve From RAGFlow').first().json.data.chunks[i];\n  related_chunks.push(\n    {\n      'dataset_id': chunk.dataset_id,\n      'document_id': chunk.document_id,\n      'chunk_id': chunk.id,\n      'keywords': chunk.important_keywords,\n      'content': chunk.content\n    }\n  );\n}\n\nreturn {related_chunks:related_chunks};"
+      },
+      "id": "28976820-5990-4c2f-808f-f0f9f2e368bb",
+      "name": "Filter Retrieved Chunks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3320,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"question\": {\n        \"type\": \"string\"\n      },\n      \"reason\": {\n        \"type\": \"string\"\n      }\n    },\n    \"required\": [\"question\", \"reason\"],\n    \"additionalProperties\": false\n  }\n}"
+      },
+      "id": "6554f6e0-0be7-4900-90b6-a018a0704a1b",
+      "name": "Potential Conflicts",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        -3620,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<proposal_law>\n{{ $('User Query').first().json.chatInput }}\n</proposal_llaw>\n\n<relevant_context>\n{{ $json.relevant_context }}\n</relevant_context>",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=Imagine that you are an expert in law inconsistency checking. You are given a proposal law and relevant context (the past official laws), which are both in Vietnamese. Your task is to generate 5 potential conflicts in the form of questions to the given proposal law. Please think step by step.\n\n<output>\nOutput in JSON format, specified as follows:\n```json\n[{\n  \"question\": # Your questions to indicate the potential conflicts in Vietnamese,\n  \"reason\": # The reason why this question may cause conflicts in Vietnamese, step by step and be as concise as possible.\n}]\n```\n</output>"
+            }
+          ]
+        }
+      },
+      "id": "c7a6a31e-de9b-4cd4-b540-a4435c1ea9e2",
+      "name": "CoT Potential Conflicts Generation",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        -3800,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<proposal_law>\n{{ $json.proposal_law }}\n</proposal_law>\n\n<question>\n{{ $json.question }}\n</question>\n\n<reason>\n{{ $json.reason }}\n</reason>\n\n<question_feedback>\n{{ $json.question_feedback }}\n</question_feedback>\n\n<reason_feedback>\n{{ $json.reason_feedback }}\n</reason_feedback>",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=As an expert in Vietnamese linguistic and excel lawyer, you have an excellent ability in Vietnamese laws understanding and inconsistency checking.\n<instruction>\n1. You are given items as follow:\n- A proposal law: A law which is under consideration for any conflict with official laws\n- A conflict question: A question to raise some problems, which may lead to potential conflicts between the proposal law and the official laws\n- A reason: A reason behind the conflict question\n- A question feedback: A feedback to the conflict question\n- A reason feedback: A feedback to the reason\n2. Your task is to rewrite the conflict question and the reason (in Vietnamese) based on the feedback, the proposed law. DO NOT make thing up.\n<\\intruction>\n\n<output>\nGo directly to the feedback without any introduction. Be as detailed as possible. Response in JSON format, of the following form:\n```json\n{\n  'rewritten_question': # The rewritten question based on the feedback in Vietnamese,\n  'rewritten_reason': # The rewritten reason based on the feedback in Vietnamese\n}\n```\n</output>"
+            }
+          ]
+        }
+      },
+      "id": "9ac3533c-5274-4137-b116-d7eb2312d2f0",
+      "name": "Refine 1",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        -2380,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<proposal_law>\n{{ $json.proposal_law }}\n</proposal_law>\n\n<question>\n{{ $json.question }}\n</question>\n\n<reason>\n{{ $json.reason }}\n</reason>",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=As a legal expert and commentator on Vietnamese laws, your role is to provide constructive feedback on proposed legislation. \n\n<instruction>\n1. You are given a proposal law, a question to raise potential conflicts caused by the proposed law, and possible reasons that can lead to the conflicts.\n2. Your task involves analyzing proposed law to give feedback to the question that highlights potential conflicts, and the reasons behind those conflicts. You can consult the below criteria:\n- Relevant: Ensure the question and reasons are directly related to the proposed law and its context.\n- Informative: The question and reasons should reflect real and logical conflicts within the relevant legal framework.\n- Consistency: Avoid introducing new concepts or ideas that are not present in the proposal or relevant laws.\n- Specificity: Focus on concrete issues rather than abstract concepts, addressing the main points directly.\n3. For each feedback, recommend the way to improve the question (or the reason) to maximize the criteria.\n</instruction>\n\n<output>\nGo directly to the feedback without any introduction. Be as detailed as possible. Response in JSON format, of the following form:\n```json\n{\n  'question_feedback': # Your unified feedback, and recommendation for improvement for question written in Vietnamese,\n  'reason_feedback': # Your unified feedback, and recommendation for improvement for the reason written in Vietnamese\n}\n```\n</output>"
+            }
+          ]
+        }
+      },
+      "id": "6b7dd814-afd9-4c67-97d7-a9b3dfa01ff4",
+      "name": "Feedback 1",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        -3040,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let chunks=$input.first().json.related_chunks;\nlet result=\"\";\nif (chunks){\n  result=chunks.map(item=>item.content).join(\"\\n=================\\n\")\n}\nreturn {'relevant_context': result};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3080,
+        20
+      ],
+      "id": "4bbd4bef-c6f3-40f9-b926-4572ea97ca80",
+      "name": "Set Relevant Context"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"question_feedback\": {\n\t\t\t\"type\": \"string\"\n\t\t},\n\t\t\"reason_feedback\": {\n\t\t\t\"type\": \"string\"\n\t\t}\n\t}\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        -3000,
+        1360
+      ],
+      "id": "7f7117e1-74da-4c68-a1d0-d2223558f45b",
+      "name": "Feedback Output Parser"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ae0c2955-1d90-4411-b8b4-c9439b07065c",
+              "name": "question_feedback",
+              "value": "={{ $json.output.question_feedback }}",
+              "type": "string"
+            },
+            {
+              "id": "00a535b7-bca2-4561-a38b-282d79f706be",
+              "name": "reason_feedback",
+              "value": "={{ $json.output.reason_feedback }}",
+              "type": "string"
+            },
+            {
+              "id": "615e0e64-4f0c-40b2-957a-7ec9eb7beda5",
+              "name": "question",
+              "value": "={{ $('Gather Information for Refine 1').item.json.question }}",
+              "type": "string"
+            },
+            {
+              "id": "a9f1ae83-617e-4581-b7ef-108089670034",
+              "name": "reason",
+              "value": "={{ $('Gather Information for Refine 1').item.json.reason }}",
+              "type": "string"
+            },
+            {
+              "id": "8c48df1a-7ddd-469a-ab10-ba55b572f127",
+              "name": "proposal_law",
+              "value": "={{ $('Gather Information for Refine 1').item.json.proposal_law }}",
+              "type": "string"
+            },
+            {
+              "id": "21383900-52f5-445c-b543-b76c6eb61c00",
+              "name": "relevant_context",
+              "value": "={{ $('Gather Information for Refine 1').item.json.relevant_context }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2620,
+        560
+      ],
+      "id": "f83d46a2-06a7-4005-af26-9a186dca54ca",
+      "name": "Feedback 1 Mapping"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ae0c2955-1d90-4411-b8b4-c9439b07065c",
+              "name": "question_feedback",
+              "value": "={{ $json.output.question_feedback }}",
+              "type": "string"
+            },
+            {
+              "id": "00a535b7-bca2-4561-a38b-282d79f706be",
+              "name": "reason_feedback",
+              "value": "={{ $json.output.reason_feedback }}",
+              "type": "string"
+            },
+            {
+              "id": "615e0e64-4f0c-40b2-957a-7ec9eb7beda5",
+              "name": "question",
+              "value": "={{ $('Gather Information for Refine 2').item.json.question }}",
+              "type": "string"
+            },
+            {
+              "id": "a9f1ae83-617e-4581-b7ef-108089670034",
+              "name": "reason",
+              "value": "={{ $('Gather Information for Refine 2').item.json.reason }}",
+              "type": "string"
+            },
+            {
+              "id": "8c48df1a-7ddd-469a-ab10-ba55b572f127",
+              "name": "proposal_law",
+              "value": "={{ $('Gather Information for Refine 2').item.json.proposal_law }}",
+              "type": "string"
+            },
+            {
+              "id": "21383900-52f5-445c-b543-b76c6eb61c00",
+              "name": "relevant_context",
+              "value": "={{ $('Gather Information for Refine 2').item.json.relevant_context }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2620,
+        820
+      ],
+      "id": "917b98e6-3830-4aed-83bf-f8131d5cc435",
+      "name": "Feedback 2 Mapping"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<proposal_law>\n{{ $json.proposal_law }}\n</proposal_law>\n\n<question>\n{{ $json.question }}\n</question>\n\n<reason>\n{{ $json.reason }}\n</reason>\n\n<original_question>\n{{ $('Gather Information for Refine 1').item.json.question }}\n</original_question>\n\n<original_reason>\n{{ $('Gather Information for Refine 1').item.json.reason }}\n</original_reason>\n",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=As a legal expert and commentator on Vietnamese laws, your role is to provide constructive feedback on proposed legislation. \n\n<instruction>\n1. You are given a text whose form like below:\n<proposal_law>\n# The proposal law we need to check for the inconsistency, in Vietnamese\n</proposal_law>\n\n<question>\n# A question to raise potential conflicts caused by the proposed law on the relevant context in Vietnamese. This may contain content not in the original. If there is, fix it.\n</question>\n\n<reason>\n# The reason behind the question in Vietnamese, answering why the question matter\n</reason>\n\n<original_question>\n# The original confict question in Vietnamese, use as a reference so that the improved question doesn't go astray\n</original_question>\n\n<original_reason>\n# The original confict reason in Vietnamese, use as a reference so that the improved question doesn't go astray\n</original_reason>\n\n\n2. Your task involves analyzing proposed law to give feedback to the question that highlights potential conflicts, and the reasons behind those conflicts. You can consult the below criteria:\n- Relevant: Ensure the question and reasons are directly related to the proposed law and its context.\n- Informative: The question and reasons should reflect real and logical conflicts within the relevant legal framework.\n- Consistency: Avoid introducing new concepts or ideas that are not present in the proposal or relevant laws.\n- Specificity: Focus on concrete issues rather than abstract concepts, addressing the main points directly.\n3. For each feedback, recommend the way to improve the question (or the reason) to maximize the criteria.\n</instruction>\n\n<output>\nGo directly to the feedback without any introduction. Be as detailed as possible. Response in JSON format, of the following form:\n```json\n{\n  'question_feedback': # Your unified feedback, and recommendation for improvement for question written in Vietnamese,\n  'reason_feedback': # Your unified feedback, and recommendation for improvement for the reason written in Vietnamese\n}\n```\n</output>"
+            }
+          ]
+        }
+      },
+      "id": "e0cda528-8601-45f2-8aa2-834ef3ff9cf6",
+      "name": "Feedback 2",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        -2980,
+        820
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<proposal_law>\n{{ $json.proposal_law }}\n</proposal_law>\n\n<question>\n{{ $json.question }}\n</question>\n\n<reason>\n{{ $json.reason }}\n</reason>\n\n<question_feedback>\n{{ $json.question_feedback }}\n</question_feedback>\n\n<reason_feedback>\n{{ $json.reason_feedback }}\n</reason_feedback>\n\n<original_question>\n{{ $('Gather Information for Refine 1').item.json.question }}\n</original_question>\n\n<original_reason>\n{{ $('Gather Information for Refine 1').item.json.reason }}\n</original_reason>",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=As an expert in Vietnamese linguistic and excel lawyer, you have an excellent ability in Vietnamese laws understanding and inconsistency checking.\n<instruction>\n1. You are given items as follow:\n<proposal_law>\n# The proposal law we need to check for the inconsistency, in Vietnamese\n</proposal_law>\n\n<question>\n# A question to raise potential conflicts caused by the proposed law on the relevant context in Vietnamese. This may contain content not in the original. If there is, fix it.\n</question>\n\n<reason>\n# The reason behind the question in Vietnamese, answering why the question matter\n</reason>\n\n<question_feedback>\n# The feedback for the current question\n</question_feedback>\n\n<reason_feedback>\n# The feedback for the current reason\n</reason_feedback>\n\n<original_question>\n# The original confict question in Vietnamese, use as a reference so that the improved question doesn't go astray\n</original_question>\n\n<original_reason>\n# The original confict reason in Vietnamese, use as a reference so that the improved question doesn't go astray\n</original_reason>\n\n2. Your task is to rewrite the conflict question and the reason (in Vietnamese) based on the feedback, the proposed law. DO NOT make thing up. You should use the original question and reason, as well as the proposed law to eliminate all irrelevant context appear in the current question and reason.\n<\\intruction>\n\n<output>\nGo directly to the feedback without any introduction. Be as detailed as possible. Response in JSON format, of the following form:\n```json\n{\n  'rewritten_question': # The rewritten question based on the feedback in Vietnamese,\n  'rewritten_reason': # The rewritten reason based on the feedback in Vietnamese\n}\n```\n</output>"
+            }
+          ]
+        }
+      },
+      "id": "094f2df7-3bf1-440a-81e0-890bd5923755",
+      "name": "Refine 2",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        -2380,
+        820
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const list_of_questions = $json.output;\nconst relevant_context = $('Set Relevant Context').first().json.relevant_context;\nvar list_of_full_message = [];\nfor (const question of list_of_questions) {\n  list_of_full_message.push(\n    {\n      'question': question.question,\n      'reason': question.reason,\n      'proposal_law': $('User Query').first().json.chatInput,\n      'relevant_context': relevant_context\n    }\n  );\n}\n\nreturn list_of_full_message;"
+      },
+      "id": "c9b5093b-aea1-4da1-b9ed-bff0afc6947f",
+      "name": "Gather Information for Refine 1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3340,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const list_of_improved_questions = $input.all().map(item => item.json.output);\nconst relevant_context = $('Set Relevant Context').first().json.relevant_context;\nconst proposal_law = $('User Query').first().json.chatInput;\nvar list_of_enhanced_message = [];\nfor (const question of list_of_improved_questions) {\n  list_of_enhanced_message.push(\n    {\n      'question': question.rewritten_question,\n      'reason': question.rewritten_reason,\n      'proposal_law': proposal_law,\n      'relevant_context': relevant_context\n    }\n  );\n}\n\nreturn list_of_enhanced_message;"
+      },
+      "id": "fbee80b0-89da-445e-8e1b-b49a28316944",
+      "name": "Gather Information for Refine 2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3340,
+        820
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.48.1:8000/api/v1/retrieval",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "question",
+              "value": "={{ $json.question }}"
+            },
+            {
+              "name": "dataset_ids",
+              "value": "={{ ['14aad2b6168c11f0bc810242c0a8e007'] }}"
+            },
+            {
+              "name": "similarity_threshold",
+              "value": "0.2"
+            },
+            {
+              "name": "vector_similarity_weight",
+              "value": "0.5"
+            },
+            {
+              "name": "top_k",
+              "value": "10"
+            },
+            {
+              "name": "page_size",
+              "value": "5"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d7a1f332-304a-44be-a930-6febd79c0304",
+      "name": "Retrieve From RAGFlow1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1740,
+        820
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "BsiYDBYhVfKwEyaP",
+          "name": "RAGFlow Authentication"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1st refined questions\nconst first_refined_questions = $('Refine 1').all().map(item=>item.json.output);\n// 2nd refined questions\nconst second_refined_questions = $('Refine 2').all().map(item=>item.json.output);\n\nconst list_of_questions = [...first_refined_questions, ...second_refined_questions];\nconst proposal_law = $('User Query').first().json.chatInput;\nconst relevant_context = $('Set Relevant Context').first().json.relevant_context;\nvar list_of_full_questions = [];\nfor (const question of list_of_questions) {\n  list_of_full_questions.push(\n    {\n      'proposal_law': proposal_law,\n      'question': question.rewritten_question,\n      'reason': question.rewritten_reason,\n      'relevant_context': relevant_context\n    }\n  );\n}\n\nreturn list_of_full_questions;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1980,
+        820
+      ],
+      "id": "8618092e-bb41-4d34-870f-185e828d7bcd",
+      "name": "Prepare Information for New Retrieval"
+    },
+    {
+      "parameters": {
+        "jsCode": "var list_of_questions_with_new_context = [];\nfor (let i=0; i<$input.all().length; i++) {\n  const question = $('Prepare Information for New Retrieval').all()[i].json;\n  question.relevant_context = $input.all()[i].json.data.chunks.map(item=>item.content.trim()).join(\"\\n\\n=====================\\n\\n\");\n  list_of_questions_with_new_context.push(question);\n}\n\nreturn list_of_questions_with_new_context;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1500,
+        820
+      ],
+      "id": "d28f8e2f-4621-41da-92f2-8640a6fe9237",
+      "name": "Prepare Input for Debating"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<proposal_law>\n{{ $json.proposal_law }}\n</proposal_law>\n\n<question>\n{{ $json.question }}\n</question>\n\n<reason>\n{{ $json.reason }}\n</reason>",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=As an expert in Vietnamese linguistic and excel lawyer, you have an excellent ability in Vietnamese laws understanding and inconsistency checking.\n<instruction>\n1. You are given items as follow:\n<proposal_law>\n# The proposal law we need to check for the inconsistency, in Vietnamese\n</proposal_law>\n\n<question>\n# A question to raise potential conflicts caused by the proposed law on the relevant context in Vietnamese.\n</question>\n\n<reason>\n# The reason behind the question in Vietnamese, answering why the question matter\n</reason>\n\n2. Your task is to answer the conflict question and judge the reason (in Vietnamese) base on the proposed law. DO NOT make thing up.\n<\\intruction>\n\n<output>\n```json\n{\n  'answer': # The short answer for the question based on the proposal law in Vietnamese,\n  'reason': # The reason behind the answer, based on the proposal law in Vietnamese,\n  'violate': # Boolean, true if the question violates the proposal law\n}\n```\n</output>"
+            }
+          ]
+        }
+      },
+      "id": "3e7da0e3-6863-40f2-93f8-a3208bd2953d",
+      "name": "Proposal Answer 1",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        -1220,
+        820
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<official_law>\n{{ $json.relevant_context }}\n</official_law>\n\n<question>\n{{ $json.question }}\n</question>\n\n<reason>\n{{ $json.reason }}\n</reason>",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=As an expert in Vietnamese linguistic and excel lawyer, you have an excellent ability in Vietnamese laws understanding and inconsistency checking.\n<instruction>\n1. You are given items as follow:\n<official_law>\n# The proposal law we need to check for the inconsistency, in Vietnamese\n</official_law>\n\n<question>\n# A question to raise potential conflicts caused by the proposed law on the relevant context in Vietnamese.\n</question>\n\n<reason>\n# The reason behind the question in Vietnamese, answering why the question matter\n</reason>\n\n2. Your task is to answer the conflict question and judge the reason (in Vietnamese) base on the official law. DO NOT make thing up.\n<\\intruction>\n\n<output>\n```json\n{\n  'answer': # The short answer for the question based on the official law in Vietnamese,\n  'reason': # The reason behind the answer, based on the official law in Vietnamese,\n  'violate': # Boolean, true if the question violates the official law\n}\n```\n</output>"
+            }
+          ]
+        }
+      },
+      "id": "0b6460b6-ccf9-454c-a80d-fa5abbe87e48",
+      "name": "Context Answer 1",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        -1220,
+        1020
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"answer\": {\n\t\t\t\"type\": \"string\"\n\t\t},\n\t\t\"reason\": {\n\t\t\t\"type\": \"string\"\n\t\t},\n        \"violate\": {\n\t\t\t\"type\": \"boolean\"\n\t\t}\n\t}\n}"
+      },
+      "id": "261b7fd2-40a6-49a4-985c-f1efae5eff71",
+      "name": "Answer Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        -1060,
+        1480
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserAutofixing",
+      "typeVersion": 1,
+      "position": [
+        -1240,
+        1260
+      ],
+      "id": "899991b6-3ccd-43d4-9b9b-def2fcdc4537",
+      "name": "Auto-fixing Output Parser"
+    },
+    {
+      "parameters": {
+        "jsCode": "const list_of_proposal_answers = $('Proposal Answer 1').all().map(item=>item.json.output);\nconst list_of_context_answers = $('Context Answer 1').all().map(item=>item.json.output);\nconst list_of_potential_conflicts = $('Prepare Input for Debating').all().map(item=>item.json);\n\nvar list_of_comments_on_proposal_answers = [];\nfor (let i=0; i<list_of_proposal_answers.length; i++) {\n  list_of_comments_on_proposal_answers.push(\n    {\n      'conflict_question': list_of_potential_conflicts[i].question,\n      'reason_behind_the_question': list_of_potential_conflicts[i].reason,\n      'potential_violation': list_of_proposal_answers[i].violate || list_of_context_answers[i].violate,\n      'reason_on_proposal_law': {\n        'answer': list_of_proposal_answers[i].answer,\n        'reason': list_of_proposal_answers[i].reason\n      },\n      'reason_on_official_law': {\n        'answer': list_of_context_answers[i].answer,\n        'reason': list_of_context_answers[i].reason,\n        'citation': list_of_potential_conflicts[i].relevant_context\n      }\n    }\n  )\n}\n\nreturn list_of_comments_on_proposal_answers;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -520,
+        1220
+      ],
+      "id": "37c2185b-750a-4294-bd1a-d407abb9716a",
+      "name": "Analyze Answers"
+    },
+    {
+      "parameters": {
+        "html": "<!DOCTYPE html>\n\n<html>\n  <head>\n    <meta charset=\"UTF-8\" />\n    <title>Proposal Law Comments</title>\n  </head>\n  <body>\n    <div class=\"container\">\n      <div class=\"proposal_law\">\n        <h1>Luật dự thảo</h1>\n        <blockquote>\n          {{ $('User Query').first().json.chatInput }}\n        </blockquote>\n      </div>\n      <div class=\"potential_conflict\">\n        <h1>Những mâu thuẫn tiềm tàng</h1>\n        <table>\n          <thead>\n            <tr>\n              <th>Câu hỏi</th>\n              <th>Suy diễn</th>\n            </tr>\n          </thead>\n          <tbody>\n            {{ $json.q2a_rows }}\n          </tbody>\n        </table>\n      </div>\n      <div class=\"answer_comparison\">\n        <h1>Suy diễn trên luật dự thảo và trên luật hiện hành</h1>\n        <h2>Bảng so sánh suy diễn trên luật dự thảo và trên luật hiện hành</h2>\n        <table>\n          <thead>\n            <tr>\n              <th>Câu hỏi</th>\n              <th>Có phạm quy không</th>\n              <th>Suy diễn trên luật dự thảo</th>\n              <th>Suy diễn trên luật hiện hành</th>\n              <th>Nguồn văn bản hiện hành</th>\n            </tr>\n          </thead>\n          <tbody>\n            {{ $json.answer_rows }}\n          </tbody>\n        </table>\n      </div>\n    </div>\n  </body>\n</html>\n\n<style>\n  .container {\n    background-color: #ffffff;\n    text-align: center;\n    padding: 16px;\n    border-radius: 8px;\n  }\n  \n  h1 {\n    color: #ff6d5a;\n    font-size: 24px;\n    font-weight: bold;\n    padding: 8px;\n  }\n  \n  h2 {\n    color: #909399;\n    font-size: 18px;\n    font-weight: bold;\n    padding: 8px;\n  }\n  \n  blockquote {\n    font-style: italic;\n    margin: 20px;\n    padding: 10px;\n    border-left: 2px solid #ccc;\n  }\n\n  table {\n    width: 100%;\n    border-collapse: collapse;\n  }\n\n  th, td {\n    border: 1px solid #ccc;\n    padding: 8px;\n    text-align: left;\n  }\n\n  th {\n    background-color: #f2f2f2;\n  }\n\n  tr:nth-child(even) {\n    background-color: #f9f9f9\n  }\n</style>"
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        20,
+        1220
+      ],
+      "id": "88e45cbb-67b4-4d8c-8cf8-ec340e289559",
+      "name": "HTML"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        -800,
+        1220
+      ],
+      "id": "7f01d317-27ff-4c74-8afb-a247ab3dbd9b",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "// // Loop over input items and add a new field called 'myNewField' to the JSON of each one\n// for (const item of $input.all()) {\n//   item.json.myNewField = 1;\n// }\n\n// return $input.all();\nlet html_code = {\n  q2a_rows: \"\",\n  answer_rows: \"\"\n};\n\n// Loop over input items and add a new field called 'myNewField' to the JSON of each one\n$input.all().forEach(item => {\n  html_code.q2a_rows += `\n  <tr>\n    <td>${item.json.conflict_question}</td>\n    <td>${item.json.reason_behind_the_question}</td>\n  </tr>\n  `;\n\n  html_code.answer_rows += `\n  <tr>\n    <td>${item.json.conflict_question}</td>\n    <td>${item.json.potential_violation}</td>\n    <td>Answer: ${item.json.reason_on_proposal_law.answer}<br>Reason: ${item.json.reason_on_proposal_law.reason}</td>\n    <td>Answer: ${item.json.reason_on_official_law.answer}<br>Reason: ${item.json.reason_on_official_law.reason}</td>\n    <td>${item.json.reason_on_official_law.citation}</td>\n  </tr>\n  `;\n});\n\nreturn [html_code];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -260,
+        1220
+      ],
+      "id": "1f0a492e-42e8-4015-ba32-160f85138ff2",
+      "name": "Export to HTML Code"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "75551c23-344b-4bf2-a509-7bebf396c372",
+              "leftValue": "={{ $json.relevant_context }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2840,
+        20
+      ],
+      "id": "642291f9-4a41-4c7d-8469-ef7e83fb5659",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "html": "<!DOCTYPE html>\n\n<html>\n  <head>\n    <meta charset=\"UTF-8\" />\n    <title>Proposal Law Comments</title>\n  </head>\n  <body>\n    Không có tài liệu liên quan\n  </body>\n</html>\n\n<style>\n  .container {\n    background-color: #ffffff;\n    text-align: center;\n    padding: 16px;\n    border-radius: 8px;\n  }\n  \n  h1 {\n    color: #ff6d5a;\n    font-size: 24px;\n    font-weight: bold;\n    padding: 8px;\n  }\n  \n  h2 {\n    color: #909399;\n    font-size: 18px;\n    font-weight: bold;\n    padding: 8px;\n  }\n  \n  blockquote {\n    font-style: italic;\n    margin: 20px;\n    padding: 10px;\n    border-left: 2px solid #ccc;\n  }\n\n  table {\n    width: 100%;\n    border-collapse: collapse;\n  }\n\n  th, td {\n    border: 1px solid #ccc;\n    padding: 8px;\n    text-align: left;\n  }\n\n  th {\n    background-color: #f2f2f2;\n  }\n\n  tr:nth-child(even) {\n    background-color: #f9f9f9\n  }\n</style>"
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        -1560,
+        220
+      ],
+      "id": "5304117f-a3ba-420e-bb91-a71002984aa3",
+      "name": "HTML1"
+    },
+    {
+      "parameters": {
+        "options": {
+          "prompt": "Instructions:\n--------------\nYou are a JSON parsing tool. Your task is to correct a JSON string without changing the main content, only change the necessary syntax\n--------------\nCompletion:\n--------------\n{completion}\n--------------\n\nAbove, the Completion did not satisfy the constraints given in the Instructions.\nError:\n--------------\n{error}\n--------------\n\nPlease try again. Please only respond with an answer that satisfies the constraints laid out in the Instructions:"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserAutofixing",
+      "typeVersion": 1,
+      "position": [
+        -3140,
+        1100
+      ],
+      "id": "b48147c8-a1f1-4bdd-8e67-d4ba9ad77cf0",
+      "name": "Auto-fixing Output Parser2"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserAutofixing",
+      "typeVersion": 1,
+      "position": [
+        -2240,
+        1060
+      ],
+      "id": "cd8a2d75-b8f0-47bb-bb52-2acbfcbc4c9e",
+      "name": "Auto-fixing Output Parser3"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"rewritten_question\": {\n\t\t\t\"type\": \"string\"\n\t\t},\n\t\t\"rewritten_reason\": {\n\t\t\t\"type\": \"string\"\n\t\t}\n\t}\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        -2080,
+        1180
+      ],
+      "id": "324ca7dc-0f98-460e-bc33-4c3f2b92c6f3",
+      "name": "Refine Output Parser"
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAzureOpenAi",
+      "typeVersion": 1,
+      "position": [
+        -2300,
+        1580
+      ],
+      "id": "9af4bc62-67f4-4e96-b3ae-ee8d0739f783",
+      "name": "Azure OpenAI Chat Model",
+      "credentials": {
+        "azureOpenAiApi": {
+          "id": "p5bVBgiTCxkJYV1Z",
+          "name": "Azure Open AI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "chatInput"
+            },
+            {
+              "name": "fileId"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -3780,
+        20
+      ],
+      "id": "4855fe1d-bf0f-4676-96c7-41dde934a289",
+      "name": "User Query"
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  \"related_chunks\": $input.first().json.related_chunks,\n  \"file_id\": $(\"User Query\").first().json.fileId,\n  \"timestamp\": new Date().toLocaleString()\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3080,
+        -180
+      ],
+      "id": "cedb4469-f8f3-4fd5-bd46-f9e8bf65b17d",
+      "name": "Filtered Chunks Info"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "collection": "detailed_log",
+        "fields": "related_chunks, file_id, timestamp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.1,
+      "position": [
+        -2840,
+        -180
+      ],
+      "id": "9a10d765-0893-4ff5-9e3c-3cd3a726788f",
+      "name": "Log Filtered Chunks Info",
+      "credentials": {
+        "mongoDb": {
+          "id": "5hgD3RXb78qYUD3q",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  'conflict_questions': $input.first().json.output,\n  'file_id': $(\"User Query\").first().json.fileId,\n  'timestamp': new Date().toLocaleString()\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3340,
+        340
+      ],
+      "id": "79b0ebc3-b481-4a8f-bf56-f662bc867eb6",
+      "name": "Conflict Questions Ìno"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "collection": "detailed_log",
+        "fields": "conflict_questions, file_id, timestamp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.1,
+      "position": [
+        -3040,
+        340
+      ],
+      "id": "ee6c4baa-0177-467f-9e94-09873240c467",
+      "name": "Log Conflict Questions",
+      "credentials": {
+        "mongoDb": {
+          "id": "5hgD3RXb78qYUD3q",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "collection": "detailed_log",
+        "fields": "refined_questions, file_id, timestamp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.1,
+      "position": [
+        -1740,
+        560
+      ],
+      "id": "871b66ad-3349-42b7-8419-3088f512269a",
+      "name": "Log Conflict Questions1",
+      "credentials": {
+        "mongoDb": {
+          "id": "5hgD3RXb78qYUD3q",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  'refined_questions': $input.all().map(item=>item.json.output),\n  'file_id': $(\"User Query\").first().json.fileId,\n  'timestamp': new Date().toLocaleString()\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1980,
+        560
+      ],
+      "id": "810b0cb0-727f-4717-8a44-403e865d40a0",
+      "name": "Refine Loop Info"
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  'debate_context': $input.all().map(item=>item.json),\n  'file_id': $(\"User Query\").first().json.fileId,\n  'timestamp': new Date().toLocaleString()\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1220,
+        620
+      ],
+      "id": "eede9080-3324-4797-b385-78e3a06dc6b7",
+      "name": "Debating Input Info"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "collection": "detailed_log",
+        "fields": "debate_context, file_id, timestamp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.1,
+      "position": [
+        -900,
+        620
+      ],
+      "id": "f131bae8-dfdc-41a7-a29b-1837061b3eb9",
+      "name": "Log Debating Input Info",
+      "credentials": {
+        "mongoDb": {
+          "id": "5hgD3RXb78qYUD3q",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  'proposal_answer': $input.all().map(item=>item.json.output),\n  'file_id': $(\"User Query\").first().json.fileId,\n  'timestamp': new Date().toLocaleString()\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -800,
+        820
+      ],
+      "id": "a00d2cf9-756b-439f-8a59-9747bfb0fa05",
+      "name": "Proposal Answer Result"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "collection": "detailed_log",
+        "fields": "proposal_answer, file_id, timestamp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.1,
+      "position": [
+        -520,
+        820
+      ],
+      "id": "d2f4ff14-dd96-4de8-a9be-2549e3ee1eba",
+      "name": "Log Proposal Answer",
+      "credentials": {
+        "mongoDb": {
+          "id": "5hgD3RXb78qYUD3q",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  'context_answer': $input.all().map(item=>item.json.output),\n  'file_id': $(\"User Query\").first().json.fileId,\n  'timestamp': new Date().toLocaleString()\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -800,
+        1020
+      ],
+      "id": "8dc695b0-e22e-4ac5-a67f-f54a15ef47dc",
+      "name": "Context Answer Result"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "collection": "detailed_log",
+        "fields": "context_answer, file_id, timestamp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.1,
+      "position": [
+        -520,
+        1020
+      ],
+      "id": "2e671a14-3388-455f-b21f-0df8e399c422",
+      "name": "Log Context Answer",
+      "credentials": {
+        "mongoDb": {
+          "id": "5hgD3RXb78qYUD3q",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        260,
+        920
+      ],
+      "id": "c880ac8d-53d9-4ec4-b095-72fb4fef2d45",
+      "name": "Return HTML"
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch",
+        "numberInputs": 7,
+        "useDataOfInput": 7
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        560,
+        460
+      ],
+      "id": "d2e35efb-99a6-4f78-841b-68efa4456a9b",
+      "name": "Return"
+    }
+  ],
+  "pinData": {
+    "User Query": [
+      {
+        "json": {
+          "chatInput": "Đất lâm nghiệp bao gồm đất dùng cho nhà ở, đất dùng cho xây dựng nhà máy",
+          "fileId": "123456789"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Retrieve From RAGFlow": {
+      "main": [
+        [
+          {
+            "node": "Filter Retrieved Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Retrieved Chunks": {
+      "main": [
+        [
+          {
+            "node": "Filtered Chunks Info",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Set Relevant Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Potential Conflicts": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "CoT Potential Conflicts Generation",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CoT Potential Conflicts Generation": {
+      "main": [
+        [
+          {
+            "node": "Gather Information for Refine 1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Conflict Questions Ìno",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refine 1": {
+      "main": [
+        [
+          {
+            "node": "Refine Loop Info",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gather Information for Refine 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Feedback 1": {
+      "main": [
+        [
+          {
+            "node": "Feedback 1 Mapping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Relevant Context": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Feedback Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Auto-fixing Output Parser2",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Feedback 1 Mapping": {
+      "main": [
+        [
+          {
+            "node": "Refine 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Feedback 2 Mapping": {
+      "main": [
+        [
+          {
+            "node": "Refine 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Feedback 2": {
+      "main": [
+        [
+          {
+            "node": "Feedback 2 Mapping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refine 2": {
+      "main": [
+        [
+          {
+            "node": "Prepare Information for New Retrieval",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Refine Loop Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gather Information for Refine 1": {
+      "main": [
+        [
+          {
+            "node": "Feedback 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gather Information for Refine 2": {
+      "main": [
+        [
+          {
+            "node": "Feedback 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve From RAGFlow1": {
+      "main": [
+        [
+          {
+            "node": "Prepare Input for Debating",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Information for New Retrieval": {
+      "main": [
+        [
+          {
+            "node": "Retrieve From RAGFlow1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Input for Debating": {
+      "main": [
+        [
+          {
+            "node": "Proposal Answer 1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Context Answer 1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Debating Input Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Proposal Answer 1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Proposal Answer Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Context Answer 1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Context Answer Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Auto-fixing Output Parser",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto-fixing Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Proposal Answer 1",
+            "type": "ai_outputParser",
+            "index": 0
+          },
+          {
+            "node": "Context Answer 1",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Answers": {
+      "main": [
+        [
+          {
+            "node": "Export to HTML Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Analyze Answers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Export to HTML Code": {
+      "main": [
+        [
+          {
+            "node": "HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "HTML1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CoT Potential Conflicts Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto-fixing Output Parser2": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Feedback 2",
+            "type": "ai_outputParser",
+            "index": 0
+          },
+          {
+            "node": "Feedback 1",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto-fixing Output Parser3": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Refine 1",
+            "type": "ai_outputParser",
+            "index": 0
+          },
+          {
+            "node": "Refine 2",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refine Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Auto-fixing Output Parser3",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Azure OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "CoT Potential Conflicts Generation",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Auto-fixing Output Parser2",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Feedback 1",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Feedback 2",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Refine 2",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Refine 1",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Auto-fixing Output Parser3",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Proposal Answer 1",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Context Answer 1",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Auto-fixing Output Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User Query": {
+      "main": [
+        [
+          {
+            "node": "Retrieve From RAGFlow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtered Chunks Info": {
+      "main": [
+        [
+          {
+            "node": "Log Filtered Chunks Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Filtered Chunks Info": {
+      "main": [
+        [
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conflict Questions Ìno": {
+      "main": [
+        [
+          {
+            "node": "Log Conflict Questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Conflict Questions": {
+      "main": [
+        [
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Refine Loop Info": {
+      "main": [
+        [
+          {
+            "node": "Log Conflict Questions1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Debating Input Info": {
+      "main": [
+        [
+          {
+            "node": "Log Debating Input Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Proposal Answer Result": {
+      "main": [
+        [
+          {
+            "node": "Log Proposal Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Context Answer Result": {
+      "main": [
+        [
+          {
+            "node": "Log Context Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML1": {
+      "main": [
+        [
+          {
+            "node": "Return HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML": {
+      "main": [
+        [
+          {
+            "node": "Return HTML",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Log Conflict Questions1": {
+      "main": [
+        [
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Log Debating Input Info": {
+      "main": [
+        [
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Log Proposal Answer": {
+      "main": [
+        [
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Log Context Answer": {
+      "main": [
+        [
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 5
+          }
+        ]
+      ]
+    },
+    "Return HTML": {
+      "main": [
+        [
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 6
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "8f936516-5316-4dc9-9700-594695da704a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d8c8372ef7a659c4f0fd0d493f164dce23076499176f8e625c9ee5f99c7551e5"
+  },
+  "id": "H6SunTBlMCTYQIJ6",
+  "tags": [
+    {
+      "createdAt": "2025-04-14T09:30:46.031Z",
+      "updatedAt": "2025-04-14T09:30:46.031Z",
+      "id": "8J6ldlcSlbTT8IXk",
+      "name": "Trinq"
+    },
+    {
+      "createdAt": "2025-04-14T09:30:52.291Z",
+      "updatedAt": "2025-04-14T09:30:52.291Z",
+      "id": "kpNxjymercZpqEZB",
+      "name": "Published"
+    }
+  ]
+}
