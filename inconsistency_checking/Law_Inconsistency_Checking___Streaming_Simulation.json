@@ -1,0 +1,298 @@
+{
+  "name": "Law Inconsistency Checking | Streaming Simulation",
+  "nodes": [
+    {
+      "parameters": {
+        "collection": "indexing_subworkflow_log",
+        "options": {},
+        "query": "={\n  \"file_id\": \"{{ $json.body.fileId }}\"\n}"
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        0
+      ],
+      "id": "489e2468-085b-4ce3-8400-544522279c3b",
+      "name": "Indexing File Status",
+      "credentials": {
+        "mongoDb": {
+          "id": "5hgD3RXb78qYUD3q",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  'workflow_type': $input.first().json.log_message.split(\"]\")[0].split(\"[\")[1].split(\" \")[0].toLowerCase()\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "id": "a677a89d-a703-47fd-9945-d8e3cb55f562",
+      "name": "Workflow Type"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f06e54e4-ac34-40b6-b08e-705125a44c25",
+              "leftValue": "={{ $json.workflow_type }}",
+              "rightValue": "short",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        0
+      ],
+      "id": "acbaa7b7-328d-4684-a377-b00f26c018e2",
+      "name": "Long or Short"
+    },
+    {
+      "parameters": {
+        "collection": "direct_comparison_log",
+        "options": {},
+        "query": "={\n  \"file_id\": \"{{ $('Webhook').first().json.body.fileId }}\"\n}"
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.1,
+      "position": [
+        920,
+        -200
+      ],
+      "id": "2ba02fbb-d7ca-4112-a47b-0a22a1e4d6b6",
+      "name": "Direct Comparison Status",
+      "credentials": {
+        "mongoDb": {
+          "id": "5hgD3RXb78qYUD3q",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "collection": "detailed_log",
+        "options": {},
+        "query": "={\n  \"file_id\": \"{{ $('Webhook').first().json.body.fileId }}\"\n}"
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.1,
+      "position": [
+        920,
+        180
+      ],
+      "id": "5a3bd57e-bf50-4409-b250-b8b5b4384585",
+      "name": "Detailed Logs Status",
+      "credentials": {
+        "mongoDb": {
+          "id": "5hgD3RXb78qYUD3q",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "if ($('Workflow Type').first().json.workflow_type === \"long\") {\n  var detaled_log_status = $(\"Detailed Logs Status\").all().map(item=>item.json);\n  var direct_comparison_status = null;\n} else {\n  var detaled_log_status = null;\n  var direct_comparison_status = $(\"Direct Comparison Status\").all().map(item=>item.json);\n}\n\nreturn {\n  'indexing_status': $(\"Indexing File Status\").all().map(item=>item.json),\n  'detaled_log_status': detaled_log_status,\n  'direct_comparison_status': direct_comparison_status\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        360
+      ],
+      "id": "23a18c9b-0be2-4512-adb5-a356931402bf",
+      "name": "Return"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "5a3a9a5c-867e-497b-9065-0e2fa9ddd12f",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -20,
+        0
+      ],
+      "id": "83c85e20-3ceb-46cc-8cc3-2b456a8ebdab",
+      "name": "Webhook",
+      "webhookId": "5a3a9a5c-867e-497b-9065-0e2fa9ddd12f"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1500,
+        360
+      ],
+      "id": "fa4e0232-3e49-437a-9a83-1eff0d5f942c",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "headers": {
+            "content-type": "application/json",
+            "user-agent": "PostmanRuntime/7.43.3",
+            "accept": "*/*",
+            "postman-token": "f88114f6-2689-4b2f-ae38-ad6015f5d83f",
+            "host": "localhost:8080",
+            "accept-encoding": "gzip, deflate, br",
+            "connection": "keep-alive",
+            "content-length": "54"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "fileId": "355aacae1aa411f08c170242c0a8e007"
+          },
+          "webhookUrl": "http://localhost:5678/webhook/5a3a9a5c-867e-497b-9065-0e2fa9ddd12f",
+          "executionMode": "production"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Indexing File Status": {
+      "main": [
+        [
+          {
+            "node": "Workflow Type",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Type": {
+      "main": [
+        [
+          {
+            "node": "Long or Short",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Long or Short": {
+      "main": [
+        [
+          {
+            "node": "Direct Comparison Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Detailed Logs Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Direct Comparison Status": {
+      "main": [
+        [
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detailed Logs Status": {
+      "main": [
+        [
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Indexing File Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "4fe8c88f-ee2e-45a4-a4d3-2320d45d07ac",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d8c8372ef7a659c4f0fd0d493f164dce23076499176f8e625c9ee5f99c7551e5"
+  },
+  "id": "whjaVUCp2G21Pe9c",
+  "tags": [
+    {
+      "createdAt": "2025-04-14T09:30:46.031Z",
+      "updatedAt": "2025-04-14T09:30:46.031Z",
+      "id": "8J6ldlcSlbTT8IXk",
+      "name": "Trinq"
+    },
+    {
+      "createdAt": "2025-04-14T09:30:52.291Z",
+      "updatedAt": "2025-04-14T09:30:52.291Z",
+      "id": "kpNxjymercZpqEZB",
+      "name": "Published"
+    }
+  ]
+}
