@@ -1,0 +1,813 @@
+{
+  "name": "Law Inconsistency Checking | Long Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "=chatInput",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1840,
+        -300
+      ],
+      "id": "4e65c400-e318-455e-9a46-945075f0e97d",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  \"chatInput\": $input.first().json.body.chatInput,\n  \"fileId\": $input.first().json.body.fileId\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        -300
+      ],
+      "id": "5c8e8b03-36f6-4984-8867-b7da7d5c1316",
+      "name": "User Query"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        1360,
+        -300
+      ],
+      "id": "117b220c-7378-4605-8b5a-d4191e40c58a",
+      "name": "When clicking ‘Test workflow’"
+    },
+    {
+      "parameters": {
+        "jsCode": "var fileExtension = $input.item.binary.data.fileExtension;\nif (fileExtension===\"markdown\") {fileExtension = '.md';};\nif (fileExtension===\"txt\") {fileExtension = \"\";};\nif (fileExtension===\"pdf\") {fileExtension = \".pdf\";};\n$input.item.binary.data.fileName += fileExtension;\n\nreturn $input.item;\n// return {'a': fileExtension}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2080,
+        -300
+      ],
+      "id": "e66f4d45-00bd-4137-9f9f-ab2314b925a6",
+      "name": "Change Filename"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.48.1:8000/api/v1/datasets/301e5842169111f09a5b0242c0a8e007/documents",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "multipart/form-data"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1600,
+        -60
+      ],
+      "id": "18fb4cf3-f631-42c9-88ff-a8569a6e8485",
+      "name": "Upload File to RAGFlow",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "BsiYDBYhVfKwEyaP",
+          "name": "RAGFlow Authentication"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.48.1:8000/api/v1/datasets/301e5842169111f09a5b0242c0a8e007/chunks",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "document_ids",
+              "value": "={{ $json.data.map(item=>item.id) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1840,
+        180
+      ],
+      "id": "54801f29-123f-4c07-bd5f-aa3baf6a28e2",
+      "name": "Start File Index",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "BsiYDBYhVfKwEyaP",
+          "name": "RAGFlow Authentication"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "http://192.168.48.1:8000/api/v1/datasets/301e5842169111f09a5b0242c0a8e007/documents",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "page_size",
+              "value": "1"
+            },
+            {
+              "name": "id",
+              "value": "={{ $('Wait for Upload').item.json.data[0].id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2280,
+        180
+      ],
+      "id": "c4673738-b93d-43e6-a0b6-eadf98e314f0",
+      "name": "Get Indexing Progress",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "BsiYDBYhVfKwEyaP",
+          "name": "RAGFlow Authentication"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a1977142-d9c8-42f4-9d0f-e7e2e4b77be3",
+              "leftValue": "={{ $json.data.docs[0].progress }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2500,
+        180
+      ],
+      "id": "f4902a21-2ad9-484c-82cc-d7290a0969dc",
+      "name": "If Done Indexing"
+    },
+    {
+      "parameters": {
+        "url": "=http://192.168.48.1:8000/api/v1/datasets/301e5842169111f09a5b0242c0a8e007/documents/{{ $('Upload File to RAGFlow').first().json.data[0].id }}/chunks",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "page_size",
+              "value": "500"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2720,
+        100
+      ],
+      "id": "9b4e2a1b-41cf-46c3-8976-132276885d59",
+      "name": "Get List of Chunks",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "BsiYDBYhVfKwEyaP",
+          "name": "RAGFlow Authentication"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1600,
+        180
+      ],
+      "id": "f63d29ec-25df-49b6-8e98-be30b4d4feea",
+      "name": "Wait for Upload",
+      "webhookId": "5fedaba0-d6fe-44fd-8862-42dd21426557"
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2720,
+        380
+      ],
+      "id": "cb70ac31-b96b-4547-8d79-5ba9811b78df",
+      "name": "Wait for Indexing",
+      "webhookId": "c9eac393-bfdf-4d13-87b1-417b924ef73f"
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  'list_of_chunks': $input.first().json.data.chunks.map(item=>item.content)\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2940,
+        100
+      ],
+      "id": "f7bdcce9-10c3-4c10-a4f1-f4a54746633b",
+      "name": "Return Chunk Contents"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        3480,
+        100
+      ],
+      "id": "586ce29b-2d15-4089-9060-3f2f5149e84c",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "jsCode": "const list_of_chunks = $input.first().json.list_of_chunks;\nvar list_of_queries = [];\nfor (const item of list_of_chunks) {\n  list_of_queries.push(\n    {\n      'query': item,\n      'file_id': $('Upload File to RAGFlow').first().json.data[0].id\n    }\n  )\n}\n\nreturn list_of_queries;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3200,
+        100
+      ],
+      "id": "f1470d33-ec7d-4af3-b521-0c1f27e14ab6",
+      "name": "List of Queries"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "collection": "indexing_subworkflow_log",
+        "fields": "log_message, file_id, timestamp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.1,
+      "position": [
+        2340,
+        -60
+      ],
+      "id": "876dc873-520b-48d2-9bad-fdb7029f2dee",
+      "name": "Log Uploaded File Info",
+      "credentials": {
+        "mongoDb": {
+          "id": "5hgD3RXb78qYUD3q",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  \"log_message\": \"[LONG WORKFLOW] File has been uploaded to the server, start indexing process.\",\n  \"file_id\": $input.first().json.data[0].id,\n  \"timestamp\": new Date().toLocaleString()\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        -60
+      ],
+      "id": "82939bd0-98ba-42b5-a4e8-489a7dd5d5f0",
+      "name": "File Upload Info"
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  \"log_message\": `[LONG WORKFLOW] File ${$input.first().json.data.docs[0].id} has been indexed. Progress message:${$input.first().json.data.docs[0].progress_msg}`,\n  \"file_id\": $input.first().json.data.docs[0].id,\n  \"timestamp\": new Date().toLocaleString()\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2720,
+        -200
+      ],
+      "id": "5e21f4c8-e418-48ac-9075-74fa79641981",
+      "name": "Indexing Process Completeion Info"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "collection": "indexing_subworkflow_log",
+        "fields": "log_message, file_id, timestamp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.1,
+      "position": [
+        2940,
+        -200
+      ],
+      "id": "e842f67e-25f7-4ae4-a0be-0c2a41cf0a30",
+      "name": "Log Indexed File Info",
+      "credentials": {
+        "mongoDb": {
+          "id": "5hgD3RXb78qYUD3q",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch",
+        "numberInputs": 3,
+        "useDataOfInput": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        4120,
+        -40
+      ],
+      "id": "f401df22-cc1d-4924-9576-f5442e413b75",
+      "name": "Return"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "H6SunTBlMCTYQIJ6",
+          "mode": "list",
+          "cachedResultName": "Law Inconsistency Checking | Detailed Logs"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chatInput": "={{ $json.query }}",
+            "fileId": "={{ $json.file_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "chatInput",
+              "displayName": "chatInput",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "fileId",
+              "displayName": "fileId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3800,
+        240
+      ],
+      "id": "9e5cc9ad-6fc7-49d4-8238-fcc6f810b331",
+      "name": "Detailed Log"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3800,
+        80
+      ],
+      "id": "0de5ac47-f2f5-4184-92e5-66c6f207f3b1",
+      "name": "Result Aggregation"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2080,
+        -60
+      ],
+      "id": "b4db1075-0992-4f47-b9e5-6fa04b1a5424",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "3cbcf039-f6c2-4fad-982f-b22195bcffe5",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        -580
+      ],
+      "id": "a029cf0a-0cb5-4a26-852a-cdab4583170d",
+      "name": "User Query_",
+      "webhookId": "3cbcf039-f6c2-4fad-982f-b22195bcffe5"
+    }
+  ],
+  "pinData": {
+    "When clicking ‘Test workflow’": [
+      {
+        "json": {
+          "headers": {
+            "host": "c18f-129-150-49-241.ngrok-free.app",
+            "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+            "content-length": "74",
+            "accept": "*/*",
+            "accept-encoding": "gzip, deflate, br, zstd",
+            "accept-language": "en-US,en;q=0.9,de-DE;q=0.8,de;q=0.7,vi-VN;q=0.6,vi;q=0.5",
+            "content-type": "application/json",
+            "origin": "http://localhost:9002",
+            "priority": "u=1, i",
+            "referer": "http://localhost:9002/",
+            "sec-ch-ua": "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"Google Chrome\";v=\"134\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"Linux\"",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "cross-site",
+            "x-forwarded-for": "171.253.234.6",
+            "x-forwarded-host": "c18f-129-150-49-241.ngrok-free.app",
+            "x-forwarded-proto": "https"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "chatInput": "Đất lâm nghiệp bao gồm nhà ở, khu dân cư.\r\n",
+            "fileId": "123456789"
+          },
+          "webhookUrl": "http://localhost:5678/webhook/8f126b0e-21dd-436b-a48e-2801c310963e",
+          "executionMode": "production"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Change Filename",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User Query": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "User Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Change Filename": {
+      "main": [
+        [
+          {
+            "node": "Upload File to RAGFlow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload File to RAGFlow": {
+      "main": [
+        [
+          {
+            "node": "File Upload Info",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Wait for Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start File Index": {
+      "main": [
+        [
+          {
+            "node": "Get Indexing Progress",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Indexing Progress": {
+      "main": [
+        [
+          {
+            "node": "If Done Indexing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Done Indexing": {
+      "main": [
+        [
+          {
+            "node": "Indexing Process Completeion Info",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get List of Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait for Indexing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get List of Chunks": {
+      "main": [
+        [
+          {
+            "node": "Return Chunk Contents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Upload": {
+      "main": [
+        [
+          {
+            "node": "Start File Index",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Indexing": {
+      "main": [
+        [
+          {
+            "node": "Get Indexing Progress",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Chunk Contents": {
+      "main": [
+        [
+          {
+            "node": "List of Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Result Aggregation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Detailed Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List of Queries": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Uploaded File Info": {
+      "main": [
+        [
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "File Upload Info": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Indexing Process Completeion Info": {
+      "main": [
+        [
+          {
+            "node": "Log Indexed File Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Indexed File Info": {
+      "main": [
+        [
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detailed Log": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Result Aggregation": {
+      "main": [
+        [
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "User Query_": {
+      "main": [
+        [
+          {
+            "node": "Change Filename",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        [
+          {
+            "node": "Log Uploaded File Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "976daaaa-37d6-4303-83d2-3da38648f020",
+  "meta": {
+    "instanceId": "d8c8372ef7a659c4f0fd0d493f164dce23076499176f8e625c9ee5f99c7551e5"
+  },
+  "id": "I3CTvjAo1GmViP2j",
+  "tags": [
+    {
+      "createdAt": "2025-04-14T09:30:46.031Z",
+      "updatedAt": "2025-04-14T09:30:46.031Z",
+      "id": "8J6ldlcSlbTT8IXk",
+      "name": "Trinq"
+    },
+    {
+      "createdAt": "2025-04-14T09:30:52.291Z",
+      "updatedAt": "2025-04-14T09:30:52.291Z",
+      "id": "kpNxjymercZpqEZB",
+      "name": "Published"
+    }
+  ]
+}
