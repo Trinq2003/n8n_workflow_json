@@ -3,58 +3,6 @@
   "nodes": [
     {
       "parameters": {
-        "operation": "toText",
-        "sourceProperty": "=chatInput",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.convertToFile",
-      "typeVersion": 1.1,
-      "position": [
-        1840,
-        -300
-      ],
-      "id": "4e65c400-e318-455e-9a46-945075f0e97d",
-      "name": "Convert to File"
-    },
-    {
-      "parameters": {
-        "jsCode": "return {\n  \"chatInput\": $input.first().json.body.chatInput,\n  \"fileId\": $input.first().json.body.fileId\n}"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1600,
-        -300
-      ],
-      "id": "5c8e8b03-36f6-4984-8867-b7da7d5c1316",
-      "name": "User Query"
-    },
-    {
-      "parameters": {},
-      "type": "n8n-nodes-base.manualTrigger",
-      "typeVersion": 1,
-      "position": [
-        1360,
-        -300
-      ],
-      "id": "117b220c-7378-4605-8b5a-d4191e40c58a",
-      "name": "When clicking ‘Test workflow’"
-    },
-    {
-      "parameters": {
-        "jsCode": "var fileExtension = $input.item.binary.data.fileExtension;\nif (fileExtension===\"markdown\") {fileExtension = '.md';};\nif (fileExtension===\"txt\") {fileExtension = \"\";};\nif (fileExtension===\"pdf\") {fileExtension = \".pdf\";};\n$input.item.binary.data.fileName += fileExtension;\n\nreturn $input.item;\n// return {'a': fileExtension}"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2080,
-        -300
-      ],
-      "id": "e66f4d45-00bd-4137-9f9f-ab2314b925a6",
-      "name": "Change Filename"
-    },
-    {
-      "parameters": {
         "method": "POST",
         "url": "http://192.168.48.1:8000/api/v1/datasets/301e5842169111f09a5b0242c0a8e007/documents",
         "authentication": "genericCredentialType",
@@ -378,7 +326,7 @@
       "parameters": {
         "mode": "chooseBranch",
         "numberInputs": 3,
-        "useDataOfInput": 3
+        "useDataOfInput": 2
       },
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.1,
@@ -458,8 +406,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        2080,
-        -60
+        2120,
+        -220
       ],
       "id": "b4db1075-0992-4f47-b9e5-6fa04b1a5424",
       "name": "Respond to Webhook"
@@ -467,103 +415,36 @@
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "3cbcf039-f6c2-4fad-982f-b22195bcffe5",
+        "path": "0809c8a6-9d96-4397-9439-017249c67891",
         "responseMode": "responseNode",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        1840,
-        -580
+        1640,
+        -460
       ],
-      "id": "a029cf0a-0cb5-4a26-852a-cdab4583170d",
-      "name": "User Query_",
-      "webhookId": "3cbcf039-f6c2-4fad-982f-b22195bcffe5"
+      "id": "bd93d064-ca7e-421b-91f1-b6389e016978",
+      "name": "User Query",
+      "webhookId": "0809c8a6-9d96-4397-9439-017249c67891"
+    },
+    {
+      "parameters": {
+        "jsCode": "var fileExtension = $input.item.binary.data.fileExtension;\nif (fileExtension===\"markdown\") {fileExtension = '.md';};\nif (fileExtension===\"txt\") {fileExtension = \"\";};\nif (fileExtension===\"pdf\") {fileExtension = \".pdf\";};\nif (fileExtension===\"html\") {fileExtension = \".html\";};\n$input.item.binary.data.fileName += fileExtension;\n\nreturn $input.item;\n// return {'a': fileExtension}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        -160
+      ],
+      "id": "94461257-6d76-4f4e-b271-f0a6d3db0da1",
+      "name": "Change Filename"
     }
   ],
-  "pinData": {
-    "When clicking ‘Test workflow’": [
-      {
-        "json": {
-          "headers": {
-            "host": "c18f-129-150-49-241.ngrok-free.app",
-            "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
-            "content-length": "74",
-            "accept": "*/*",
-            "accept-encoding": "gzip, deflate, br, zstd",
-            "accept-language": "en-US,en;q=0.9,de-DE;q=0.8,de;q=0.7,vi-VN;q=0.6,vi;q=0.5",
-            "content-type": "application/json",
-            "origin": "http://localhost:9002",
-            "priority": "u=1, i",
-            "referer": "http://localhost:9002/",
-            "sec-ch-ua": "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"Google Chrome\";v=\"134\"",
-            "sec-ch-ua-mobile": "?0",
-            "sec-ch-ua-platform": "\"Linux\"",
-            "sec-fetch-dest": "empty",
-            "sec-fetch-mode": "cors",
-            "sec-fetch-site": "cross-site",
-            "x-forwarded-for": "171.253.234.6",
-            "x-forwarded-host": "c18f-129-150-49-241.ngrok-free.app",
-            "x-forwarded-proto": "https"
-          },
-          "params": {},
-          "query": {},
-          "body": {
-            "chatInput": "Đất lâm nghiệp bao gồm nhà ở, khu dân cư.\r\n",
-            "fileId": "123456789"
-          },
-          "webhookUrl": "http://localhost:5678/webhook/8f126b0e-21dd-436b-a48e-2801c310963e",
-          "executionMode": "production"
-        }
-      }
-    ]
-  },
+  "pinData": {},
   "connections": {
-    "Convert to File": {
-      "main": [
-        [
-          {
-            "node": "Change Filename",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "User Query": {
-      "main": [
-        [
-          {
-            "node": "Convert to File",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "When clicking ‘Test workflow’": {
-      "main": [
-        [
-          {
-            "node": "User Query",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Change Filename": {
-      "main": [
-        [
-          {
-            "node": "Upload File to RAGFlow",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Upload File to RAGFlow": {
       "main": [
         [
@@ -700,13 +581,7 @@
     },
     "Log Uploaded File Info": {
       "main": [
-        [
-          {
-            "node": "Return",
-            "type": "main",
-            "index": 1
-          }
-        ]
+        []
       ]
     },
     "File Upload Info": {
@@ -764,7 +639,23 @@
         ]
       ]
     },
-    "User Query_": {
+    "Respond to Webhook": {
+      "main": [
+        [
+          {
+            "node": "Log Uploaded File Info",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "User Query": {
       "main": [
         [
           {
@@ -775,11 +666,11 @@
         ]
       ]
     },
-    "Respond to Webhook": {
+    "Change Filename": {
       "main": [
         [
           {
-            "node": "Log Uploaded File Info",
+            "node": "Upload File to RAGFlow",
             "type": "main",
             "index": 0
           }
@@ -787,11 +678,11 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "976daaaa-37d6-4303-83d2-3da38648f020",
+  "versionId": "baad5ed1-11f1-4a7a-ab5d-46f8ba6dddad",
   "meta": {
     "instanceId": "d8c8372ef7a659c4f0fd0d493f164dce23076499176f8e625c9ee5f99c7551e5"
   },

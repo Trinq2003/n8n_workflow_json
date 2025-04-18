@@ -85,8 +85,8 @@
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.2,
       "position": [
-        -3620,
-        760
+        -3480,
+        1060
       ]
     },
     {
@@ -109,7 +109,8 @@
       "position": [
         -3800,
         560
-      ]
+      ],
+      "retryOnFail": true
     },
     {
       "parameters": {
@@ -131,7 +132,8 @@
       "position": [
         -2380,
         560
-      ]
+      ],
+      "retryOnFail": true
     },
     {
       "parameters": {
@@ -151,9 +153,10 @@
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
       "position": [
-        -3040,
+        -3080,
         560
-      ]
+      ],
+      "retryOnFail": true
     },
     {
       "parameters": {
@@ -306,9 +309,10 @@
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
       "position": [
-        -2980,
+        -3080,
         820
-      ]
+      ],
+      "retryOnFail": true
     },
     {
       "parameters": {
@@ -330,7 +334,8 @@
       "position": [
         -2380,
         820
-      ]
+      ],
+      "retryOnFail": true
     },
     {
       "parameters": {
@@ -465,7 +470,8 @@
       "position": [
         -1220,
         820
-      ]
+      ],
+      "retryOnFail": true
     },
     {
       "parameters": {
@@ -487,7 +493,8 @@
       "position": [
         -1220,
         1020
-      ]
+      ],
+      "retryOnFail": true
     },
     {
       "parameters": {
@@ -654,26 +661,6 @@
       ],
       "id": "324ca7dc-0f98-460e-bc33-4c3f2b92c6f3",
       "name": "Refine Output Parser"
-    },
-    {
-      "parameters": {
-        "model": "gpt-4o",
-        "options": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.lmChatAzureOpenAi",
-      "typeVersion": 1,
-      "position": [
-        -2300,
-        1580
-      ],
-      "id": "9af4bc62-67f4-4e96-b3ae-ee8d0739f783",
-      "name": "Azure OpenAI Chat Model",
-      "credentials": {
-        "azureOpenAiApi": {
-          "id": "p5bVBgiTCxkJYV1Z",
-          "name": "Azure Open AI account"
-        }
-      }
     },
     {
       "parameters": {
@@ -927,11 +914,101 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.1,
       "position": [
-        560,
+        920,
         460
       ],
       "id": "d2e35efb-99a6-4f78-841b-68efa4456a9b",
       "name": "Return"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "collection": "result",
+        "fields": "html, file_id, timestamp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        920
+      ],
+      "id": "a72ac7db-1a57-4b69-850b-7eedfdbbfeaa",
+      "name": "Save Output",
+      "credentials": {
+        "mongoDb": {
+          "id": "5hgD3RXb78qYUD3q",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  \"html\": $input.first().json.html,\n  \"file_id\": $(\"User Query\").first().json.fileId,\n  \"timestamp\": new Date().toLocaleString()\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        920
+      ],
+      "id": "bfab7b07-6433-403a-8e46-e8c113c49e4e",
+      "name": "HTML Output"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserAutofixing",
+      "typeVersion": 1,
+      "position": [
+        -3700,
+        860
+      ],
+      "id": "3e14add7-8956-4b65-829b-d525047fd1b9",
+      "name": "Auto-fixing Output Parser1"
+    },
+    {
+      "parameters": {
+        "model": "gemma3:27b",
+        "options": {
+          "temperature": 1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -2060,
+        1560
+      ],
+      "id": "e06c040a-0485-49fb-b810-24538d97a0ec",
+      "name": "Output Correcter",
+      "credentials": {
+        "ollamaApi": {
+          "id": "VH0VZAHHQ09mppMY",
+          "name": "Ollama DGX"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "gemma3:27b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -1740,
+        1560
+      ],
+      "id": "f0f5e07e-4e7e-4bf7-a7e0-91b1e8df9619",
+      "name": "Content Generator",
+      "credentials": {
+        "ollamaApi": {
+          "id": "VH0VZAHHQ09mppMY",
+          "name": "Ollama DGX"
+        }
+      }
     }
   ],
   "pinData": {
@@ -976,7 +1053,7 @@
       "ai_outputParser": [
         [
           {
-            "node": "CoT Potential Conflicts Generation",
+            "node": "Auto-fixing Output Parser1",
             "type": "ai_outputParser",
             "index": 0
           }
@@ -1315,62 +1392,6 @@
         ]
       ]
     },
-    "Azure OpenAI Chat Model": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "CoT Potential Conflicts Generation",
-            "type": "ai_languageModel",
-            "index": 0
-          },
-          {
-            "node": "Auto-fixing Output Parser2",
-            "type": "ai_languageModel",
-            "index": 0
-          },
-          {
-            "node": "Feedback 1",
-            "type": "ai_languageModel",
-            "index": 0
-          },
-          {
-            "node": "Feedback 2",
-            "type": "ai_languageModel",
-            "index": 0
-          },
-          {
-            "node": "Refine 2",
-            "type": "ai_languageModel",
-            "index": 0
-          },
-          {
-            "node": "Refine 1",
-            "type": "ai_languageModel",
-            "index": 0
-          },
-          {
-            "node": "Auto-fixing Output Parser3",
-            "type": "ai_languageModel",
-            "index": 0
-          },
-          {
-            "node": "Proposal Answer 1",
-            "type": "ai_languageModel",
-            "index": 0
-          },
-          {
-            "node": "Context Answer 1",
-            "type": "ai_languageModel",
-            "index": 0
-          },
-          {
-            "node": "Auto-fixing Output Parser",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "User Query": {
       "main": [
         [
@@ -1540,9 +1561,109 @@
       "main": [
         [
           {
+            "node": "HTML Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML Output": {
+      "main": [
+        [
+          {
+            "node": "Save Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Output": {
+      "main": [
+        [
+          {
             "node": "Return",
             "type": "main",
             "index": 6
+          }
+        ]
+      ]
+    },
+    "Auto-fixing Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "CoT Potential Conflicts Generation",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Output Correcter": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Auto-fixing Output Parser1",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Auto-fixing Output Parser2",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Auto-fixing Output Parser3",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Auto-fixing Output Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Content Generator": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "CoT Potential Conflicts Generation",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Feedback 1",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Feedback 2",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Refine 2",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Refine 1",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Proposal Answer 1",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Context Answer 1",
+            "type": "ai_languageModel",
+            "index": 0
           }
         ]
       ]
@@ -1552,7 +1673,7 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "8f936516-5316-4dc9-9700-594695da704a",
+  "versionId": "64f3f825-0455-4c88-891f-94bd92d03340",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "d8c8372ef7a659c4f0fd0d493f164dce23076499176f8e625c9ee5f99c7551e5"

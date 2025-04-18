@@ -11,10 +11,11 @@
       "typeVersion": 1.1,
       "position": [
         220,
-        0
+        80
       ],
       "id": "489e2468-085b-4ce3-8400-544522279c3b",
       "name": "Indexing File Status",
+      "alwaysOutputData": true,
       "credentials": {
         "mongoDb": {
           "id": "5hgD3RXb78qYUD3q",
@@ -24,13 +25,13 @@
     },
     {
       "parameters": {
-        "jsCode": "return {\n  'workflow_type': $input.first().json.log_message.split(\"]\")[0].split(\"[\")[1].split(\" \")[0].toLowerCase()\n};"
+        "jsCode": "const isEmpty = (obj) => Object.keys(obj).length === 0;\nif (isEmpty($input.first().json)) {\n  return {\n    'status': \"Indexing\",\n    'message': \"File is waiting for indexing process.\"\n  }\n} else {\n  return {\n  'workflow_type': $input.first().json.log_message.split(\"]\")[0].split(\"[\")[1].split(\" \")[0].toLowerCase()\n};\n}\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         440,
-        0
+        80
       ],
       "id": "a677a89d-a703-47fd-9945-d8e3cb55f562",
       "name": "Workflow Type"
@@ -63,8 +64,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        660,
-        0
+        920,
+        -20
       ],
       "id": "acbaa7b7-328d-4684-a377-b00f26c018e2",
       "name": "Long or Short"
@@ -78,11 +79,13 @@
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.1,
       "position": [
-        920,
+        1140,
         -200
       ],
       "id": "2ba02fbb-d7ca-4112-a47b-0a22a1e4d6b6",
       "name": "Direct Comparison Status",
+      "executeOnce": false,
+      "alwaysOutputData": true,
       "credentials": {
         "mongoDb": {
           "id": "5hgD3RXb78qYUD3q",
@@ -99,11 +102,12 @@
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.1,
       "position": [
-        920,
+        1140,
         180
       ],
       "id": "5a3bd57e-bf50-4409-b250-b8b5b4384585",
       "name": "Detailed Logs Status",
+      "alwaysOutputData": true,
       "credentials": {
         "mongoDb": {
           "id": "5hgD3RXb78qYUD3q",
@@ -113,13 +117,13 @@
     },
     {
       "parameters": {
-        "jsCode": "if ($('Workflow Type').first().json.workflow_type === \"long\") {\n  var detaled_log_status = $(\"Detailed Logs Status\").all().map(item=>item.json);\n  var direct_comparison_status = null;\n} else {\n  var detaled_log_status = null;\n  var direct_comparison_status = $(\"Direct Comparison Status\").all().map(item=>item.json);\n}\n\nreturn {\n  'indexing_status': $(\"Indexing File Status\").all().map(item=>item.json),\n  'detaled_log_status': detaled_log_status,\n  'direct_comparison_status': direct_comparison_status\n}"
+        "jsCode": "return {\n  'status': $input.first().json.status,\n  'message': $input.first().json.log_message\n}"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1280,
-        360
+        1580,
+        20
       ],
       "id": "23a18c9b-0be2-4512-adb5-a356931402bf",
       "name": "Return"
@@ -135,7 +139,7 @@
       "typeVersion": 2,
       "position": [
         -20,
-        0
+        80
       ],
       "id": "83c85e20-3ceb-46cc-8cc3-2b456a8ebdab",
       "name": "Webhook",
@@ -148,11 +152,72 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        1500,
-        360
+        2200,
+        420
       ],
       "id": "fa4e0232-3e49-437a-9a83-1eff0d5f942c",
       "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const isEmpty = (obj) => Object.keys(obj).length === 0;\nif (isEmpty($input.first().json)) {\n  return {\n    'status': \"Indexing\",\n    'log_message': \"File is waiting for indexing process.\"\n  }\n}\n\nconst list_of_stages = $input.all().map(item => item.json);\nlet num_of_retrieved_laws = 0;\nvar status_str = \"\";\n\nif (list_of_stages.length === 0) {\n  return {status: \"Indexing\", log_message: \"Tài liệu đang được xử lý\"};\n}\n\nfor (const stage of list_of_stages) {\n  if (stage.hasOwnProperty(\"retrieved_chunks\")) {\n    num_of_retrieved_laws = stage.retrieved_chunks.length;\n    var status_log = \"\";\n    status_log += `[TRẠNG THÁI] Đang truy vấn trong các bộ luật hiện hành...\\n`;\n    status_log += `Đã tìm thấy ${num_of_retrieved_laws} điều luật\\n`;\n    status_log += `Nội dung các điều luật như sau:\\n`;\n    status_log += `${stage.retrieved_chunks.map((item, index)=>`Điều luật số ${index+1}.\\n=================\\n${item.content}\\n=================`).join(\"\\n\")}`;\n    status_str = \"Retrieval\";\n  }\n\n  if (stage.hasOwnProperty(\"filtered_chunks\")) {\n    const num_of_filtered_laws = stage.filtered_chunks.length;\n    var status_log = \"\";\n    status_log += `[TRẠNG THÁI] Đang lọc các điều luật đã được truy vấn...\\n`;\n    status_log += `Đã chọn ${num_of_filtered_laws} trên tổng số  ${num_of_retrieved_laws} điều luật được truy vấn\\n`;\n    status_log += `Nội dung các điều luật như sau:\\n`;\n    status_log += `${stage.filtered_chunks.map((item, index)=>`Điều luật số ${index+1}.\\n=================\\n${item.chunk_content}\\n=================`).join(\"\\n\")}`;\n    status_str = \"Filtering\";\n  }\n\n  if (stage.hasOwnProperty(\"answer_analyzing\")) {\n    var status_log = \"\";\n    status_log += `[TRẠNG THÁI] Đang phân tích mâu thuẫn giữa luật dự thảo và luật hiện hành...\\n`;\n    status_log += `Nội dung phân tích như sau:\\n`;\n    status_log += `${stage.answer_analyzing.map((item, index)=>`Điều luật số ${index+1}.\\n=================\\n${item.official_law}\\n=================\\Mâu thuẫn tiềm tàng: ${item.potential_conflict}\\nLí do: ${item.reason}`).join(\"\\n\")}`;\n    status_str = \"Answer analyzing\";\n  }\n}\n\nreturn {status: status_str, log_message: status_log};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        -200
+      ],
+      "id": "9afa9a7d-6f5e-4350-86cc-f006b93fd1f6",
+      "name": "DC Verbalization"
+    },
+    {
+      "parameters": {
+        "jsCode": "const isEmpty = (obj) => Object.keys(obj).length === 0;\nif (isEmpty($input.first().json)) {\n  return {\n    'status': \"Indexing\",\n    'log_message': \"File is waiting for indexing process.\"\n  }\n}\n\nconst list_of_stages = $input.all().map(item => item.json);\nlet num_of_retrieved_laws = 0;\nvar status_str = \"\";\n\nif (list_of_stages.length === 0) {\n  return {status: \"Indexing\", log_message: \"Tài liệu đang được xử lý\"};\n}\n\nfor (const stage of list_of_stages) {\n  if (stage.hasOwnProperty(\"related_chunks\")) {\n    num_of_retrieved_laws = stage.related_chunks.length;\n    var status_log = \"\";\n    status_log += `[TRẠNG THÁI] Đang truy vấn trong các bộ luật hiện hành...\\n`;\n    status_log += `Đã tìm thấy ${num_of_retrieved_laws} điều luật\\n`;\n    status_log += `Nội dung các điều luật như sau:\\n`;\n    status_log += `${stage.related_chunks.map((item, index)=>`Điều luật số ${index+1}.\\n=================\\n${item.content}\\n=================`).join(\"\\n\")}`;\n    status_str = \"Retrieval\";\n  }\n\n  if (stage.hasOwnProperty(\"conflict_questions\")) {\n    const num_of_conflict_questions = stage.conflict_questions.length;\n    var status_log = \"\";\n    status_log += `[TRẠNG THÁI] Đang sinh ra các câu hỏi tình huống...\\n`;\n    status_log += `Đã sinh ra ${num_of_conflict_questions} câu hỏi tình huống\\n`;\n    status_log += `Nội dung các câu hỏi như sau:\\n`;\n    status_log += `${stage.conflict_questions.map((item, index)=>`Câu hỏi số ${index+1}.\\n=================\\nCâu hỏi: ${item.question}\\nSuy diễn: ${item.reason}\\n=================`).join(\"\\n\")}`;\n    status_str = \"Conflict question generation\";\n  }\n\n  if (stage.hasOwnProperty(\"refined_questions\")) {\n    var status_log = \"\";\n    status_log += `[TRẠNG THÁI] Đang tinh chỉnh và cải thiện câu hỏi tình huống...\\n`;\n    status_log += `Nội dung phân tích như sau:\\n`;\n    status_log += `${stage.refined_questions.map((item, index)=>`Câu hỏi số ${index+1}.\\n=================\\nCâu hỏi: ${item.rewritten_question}\\nSuy diễn: ${item.rewritten_reason}\\n=================`).join(\"\\n\")}`;\n    status_str = \"Refining conflict questions\"\n  }\n\n  if (stage.hasOwnProperty(\"debate_context\")) {\n    var status_log = \"\";\n    const num_of_debate_rounds = stage.debate_context.length;\n    status_log += `[TRẠNG THÁI] Đang phản biện dựa trên nội dung được cung cấp...\\nCó tổng cộng ${num_of_debate_rounds} vòng phản biện. Nội dung của các vòng như sau:\\n`;\n    status_log += `${stage.debate_context.map((item, index)=>`Lượt số  ${index+1}.\\n=================\\nLuật dự thảo: ${item.proposal_law}\\nCâu hỏi tình huống: ${item.question}\\nLí luận: ${item.reason}\\nNội dung liên quan: ${item.relevant_context}\\n=================`).join(\"\\n\")}`;\n    status_str = \"Debating\";\n  }\n\n  if (stage.hasOwnProperty(\"proposal_answer\")) {\n    var status_log = \"\";\n    status_log += `[TRẠNG THÁI] Đang sinh câu trả lời dựa trên luật dự thảo...\\n`;\n    status_log += `${stage.proposal_answer.map((item, index)=>`Câu hỏi số  ${index+1}.\\n=================\\nCâu trả lời: ${item.answer}\\nLí luận: ${item.reason}\\nCó khả năng vi phạm không: ${item.violate}\\n=================`).join(\"\\n\")}`;\n    status_str = \"Answering on proposal laws\";\n  }\n\n  if (stage.hasOwnProperty(\"context_answer\")) {\n    var status_log = \"\";\n    status_log += `[TRẠNG THÁI] Đang sinh câu trả lời dựa trên luật hiện hành...\\n`;\n    status_log += `${stage.context_answer.map((item, index)=>`Câu hỏi số  ${index+1}.\\n=================\\nCâu trả lời: ${item.answer}\\nLí luận: ${item.reason}\\nCó khả năng vi phạm không: ${item.violate}\\n=================`).join(\"\\n\")}`;\n    status_str = \"Answering on official laws\";\n  }\n}\n\nreturn {status: status_str, log_message: status_log}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        180
+      ],
+      "id": "3c0cbdee-fc6b-4a6b-9811-745f4dcf8e0a",
+      "name": "DL Verbalization",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "56b19638-045f-460e-8d8e-a51b5639d4f8",
+              "leftValue": "={{ $json.workflow_type }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        80
+      ],
+      "id": "8ff2001e-7180-440b-99c1-54f2f78258e6",
+      "name": "If"
     }
   ],
   "pinData": {
@@ -172,7 +237,7 @@
           "params": {},
           "query": {},
           "body": {
-            "fileId": "355aacae1aa411f08c170242c0a8e007"
+            "fileId": "9c4074181bac11f0913c0242c0a8e007"
           },
           "webhookUrl": "http://localhost:5678/webhook/5a3a9a5c-867e-497b-9065-0e2fa9ddd12f",
           "executionMode": "production"
@@ -188,11 +253,6 @@
             "node": "Workflow Type",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Return",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
@@ -201,7 +261,7 @@
       "main": [
         [
           {
-            "node": "Long or Short",
+            "node": "If",
             "type": "main",
             "index": 0
           }
@@ -230,7 +290,7 @@
       "main": [
         [
           {
-            "node": "Return",
+            "node": "DC Verbalization",
             "type": "main",
             "index": 0
           }
@@ -241,7 +301,7 @@
       "main": [
         [
           {
-            "node": "Return",
+            "node": "DL Verbalization",
             "type": "main",
             "index": 0
           }
@@ -269,13 +329,53 @@
           }
         ]
       ]
+    },
+    "DC Verbalization": {
+      "main": [
+        [
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DL Verbalization": {
+      "main": [
+        [
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Long or Short",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "4fe8c88f-ee2e-45a4-a4d3-2320d45d07ac",
+  "versionId": "c2f109c3-2dba-49a4-84f1-c3a6280d6e22",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "d8c8372ef7a659c4f0fd0d493f164dce23076499176f8e625c9ee5f99c7551e5"

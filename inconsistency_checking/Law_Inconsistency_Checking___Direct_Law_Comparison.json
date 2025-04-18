@@ -88,26 +88,18 @@
       "typeVersion": 1,
       "position": [
         640,
-        -200
+        -160
       ]
     },
     {
       "parameters": {
         "promptType": "define",
-        "text": "=<query>\n{{ $('User Query').item.json.chatInput }}\n</query>\n\n<context>\nNumber of items: {{ $json.data.chunks.length }}\n{{ $json.data.chunks.map((item, index) => `Item ${index+1}.\\n=========\\n ${item.content}\\n=========\\n`).join(\"\\n\") }}\n</context>",
+        "text": "=<query>\n{{ $('User Query').item.json.chatInput }}\n</query>\n\n<context>\nSố lượng điều luật: {{ $json.data.chunks.length }}\n{{ $json.data.chunks.map((item, index) => `Điều luật ${index+1}.\\n=========\\n ${item.content}\\n=========\\n`).join(\"\\n\") }}\n</context>",
         "hasOutputParser": true,
         "messages": {
           "messageValues": [
             {
-              "message": "=As an expert Vietnamese lawyer, your task is to determine which law applies to a specific query. You need to ensure that the laws you consider are consistent.\n<instruction>\nYou will be provided with a query and a list of five relevant contexts (all written in Vietnamese). Carefully read through each context and decide whether it is directly relevant to the query.\n</instruction>\n<output>\nYour output should indicate \"related\" or \"unrelated\" for each context, with each response on a separate line. The number of line MUST match the number of official laws.\n</output>\n"
-            },
-            {
-              "type": "HumanMessagePromptTemplate",
-              "message": "=<query>\nTrường hợp ngang nhau thì bên có ý kiến của Chủ tịch Hội sẽ được chấp thuận. 3. Ban Chấp hành có nhiệm vụ và quyền hạn sau đây: a) Quyết định các biện pháp thực hiện nghị quyết, chương trình hoạt động trong nhiệm kỳ của Đại hội; b) Quyết định chương trình, kế hoạch công tác hàng năm hoặc giữa các kỳ họp của Ban Chấp hành; c) Thông qua kế hoạch và quyết toán tài chính nhiệm kỳ và hàng năm của Hội;\n</query>\n\n<context>\n1. V. Hồ sơ, gồm: Điều 14. Ban Chấp hành Hội (hoặc tên gọi khác) 3. Nguyên tắc hoạt động của Ban Chấp hành: d) Các nghị quyết, quyết định của Ban Chấp hành được thông qua khi có trên ... tổng số ủy viên Ban Chấp hành dự họp biểu quyết tán thành. Trong trường hợp số ý kiến tán thành và không tán thành ngang nhau thì quyết định thuộc về bên có ý kiến của Chủ tịch Hội. Điều 15. Ban Thường vụ Hội (hoặc tên gọi khác) 1. Ban Thường vụ Hội do Ban Chấp hành bầu trong số các ủy viên Ban Chấp hành; Ban Thường vụ Hội gồm: Chủ tịch, các Phó Chủ tịch và các ủy viên. Số lượng, cơ cấu, tiêu chuẩn ủy viên Ban Thường vụ do Ban Chấp hành quyết định. Nhiệm kỳ của Ban Thường vụ cùng với nhiệm kỳ Đại hội. 2. Nhiệm vụ và quyền hạn của Ban Thuờng vụ:\n\n\n2. Điều 13. Ban Chấp hành Trung ương Hội 2. Ban Chấp hành hoạt động theo Quy chế và Điều lệ Hội. Ban Chấp hành họp thường kỳ mỗi năm một lần; khi cần thiết có thể họp bất thường. Các quyết định, nghị quyết của Ban Chấp hành được thông qua và có hiệu lực khi có trên 50% tổng số ủy viên chính thức dự họp tán thành. Trường hợp ngang nhau thì bên có ý kiến của Chủ tịch Hội sẽ được chấp thuận. 3. Ban Chấp hành có nhiệm vụ và quyền hạn sau đây: a) Quyết định các biện pháp thực hiện nghị quyết, chương trình hoạt động trong nhiệm kỳ của Đại hội; b) Quyết định chương trình, kế hoạch công tác hàng năm hoặc giữa các kỳ họp của Ban Chấp hành; c) Thông qua kế hoạch và quyết toán tài chính nhiệm kỳ và hàng năm của Hội;\n\n\n3. Điều 14. Ban Chấp hành Hội 4. Nguyên tắc hoạt động của Ban Chấp hành: d) Các nghị quyết, quyết định của Ban Chấp hành được thông qua khi có trên 1/2 (một phần hai) tổng số ủy viên Ban Chấp hành tham gia dự họp biểu quyết tán thành. Trường hợp số ý kiến tán thành và không tán thành ngang nhau thì quyết định thuộc về bên có ý kiến của Chủ tịch Hội. Điều 15. Ban Thường vụ Hội 1. Ban Thường vụ Hội do Ban Chấp hành bầu trong số các ủy viên Ban Chấp hành; Ban Thường vụ Hội gồm: Chủ tịch, các Phó Chủ tịch, Tổng thư ký và các ủy viên. Số lượng, cơ cấu, tiêu chuẩn ủy viên Ban Thường vụ do Ban Chấp hành Hội quyết định. Nhiệm kỳ của Ban Thường vụ cùng với nhiệm kỳ Đại hội. 2. Nhiệm vụ, quyền hạn của Ban Thường vụ:\n\n\n4. V. Hồ sơ, gồm: Điều 14. Ban Chấp hành Hội (hoặc tên gọi khác) 3. Nguyên tắc hoạt động của Ban Chấp hành: d) Các nghị quyết, quyết định của Ban Chấp hành được thông qua khi có trên ... tổng số ủy viên Ban Chấp hành dự họp biểu quyết tán thành. Trong trường hợp số ý kiến tán thành và không tán thành ngang nhau thi quyết định thuộc về bên có ý kiến của Chủ tịch Hội. Điều 15. Ban Thường vụ Hội (hoặc tên gọi khác) 1- Ban Thường vụ Hội do Ban Chấp hành bầu trong số các ủy viên Ban Chấp hành; Ban Thường vụ Hội gồm: Chủ tịch, các Phó Chủ tịch và các ủy viên, số lượng, cơ cấu, tiêu chuẩn ủy viên Ban Thường vụ do Ban Chấp hành quyết định. Nhiệm kỳ của Ban Thường vụ cùng với nhiệm kỳ Đại hội. 2. Nhiệm vụ và quyền hạn của Ban Thường vụ:\n\n\n5. Điều 14. Ban Chấp hành Hội 4. Nguyên tắc hoạt động của Ban Chấp hành: b) Các cuộc họp của Ban Chấp hành được xem là hợp lệ khi có 2/3 (hai phần ba) số lượng ủy viên Ban Chấp hành tham gia dự họp. Ban Chấp hành biểu quyết theo nguyên tắc quá bán, thiểu số phục tùng đa số. Trong trường hợp biểu quyết ngang nhau thì quyết định thuộc về bên có ý kiến của Chủ tịch Hội hoặc người chủ trì hội nghị. Ban Chấp hành có thể biểu quyết bằng hình thức giơ tay hoặc bỏ phiếu kín. Việc quy định hình thức biểu quyết họp Ban Chấp hành do Ban Chấp hành Hội quyết định; c) Giữa hai kỳ họp Ban Chấp hành để quyết định các vấn đề thuộc thẩm quyền của Ban Chấp hành có thể hội ý, thảo luận, thông qua lấy ý kiến bằng văn bản;\n</context>"
-            },
-            {
-              "type": "AIMessagePromptTemplate",
-              "message": "=related\nunrelated\nrelated\nrelated\nunrelated"
+              "message": "=As an expert Vietnamese lawyer, your task is to determine which law applies to a specific query. You need to ensure that the laws you consider are consistent.\n<instruction>\nYou will be provided with a query and a list of five relevant contexts (all written in Vietnamese). Carefully read through each context and decide whether it is directly relevant to the query.\n</instruction>\n<output>\nYour output should indicate \"related\" or \"unrelated\" for each context, with each response on a separate line. The number of lines **MUST** match the number of official laws.\n</output>\n"
             }
           ]
         }
@@ -119,7 +111,8 @@
       "position": [
         460,
         -380
-      ]
+      ],
+      "retryOnFail": true
     },
     {
       "parameters": {
@@ -155,7 +148,8 @@
         -180
       ],
       "id": "92765d0b-7328-4cea-98ad-ff90a241a345",
-      "name": "Law Consistency Checker"
+      "name": "Law Consistency Checker",
+      "retryOnFail": true
     },
     {
       "parameters": {
@@ -164,7 +158,7 @@
       "type": "n8n-nodes-base.html",
       "typeVersion": 1.2,
       "position": [
-        2260,
+        2060,
         -180
       ],
       "id": "56d60be1-ff18-491e-a47c-ff674a79e8aa",
@@ -230,26 +224,6 @@
       ],
       "id": "cde95150-d91a-405d-833b-9ddea7ed4bf8",
       "name": "User Query"
-    },
-    {
-      "parameters": {
-        "model": "gpt-4o",
-        "options": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.lmChatAzureOpenAi",
-      "typeVersion": 1,
-      "position": [
-        460,
-        100
-      ],
-      "id": "0dec0ce7-b764-4dc6-8bb4-061ced3edf6d",
-      "name": "Azure OpenAI Chat Model",
-      "credentials": {
-        "azureOpenAiApi": {
-          "id": "p5bVBgiTCxkJYV1Z",
-          "name": "Azure Open AI account"
-        }
-      }
     },
     {
       "parameters": {
@@ -365,11 +339,90 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.1,
       "position": [
-        2560,
+        2860,
         -640
       ],
       "id": "94856998-da6e-4d55-bdbc-01551b1d7cac",
       "name": "Return"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "collection": "result",
+        "fields": "html, file_id, timestamp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.1,
+      "position": [
+        2500,
+        -180
+      ],
+      "id": "402cfcf2-858d-4adb-84a1-466cf6e6c651",
+      "name": "Save Output",
+      "credentials": {
+        "mongoDb": {
+          "id": "5hgD3RXb78qYUD3q",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  \"html\": $input.first().json.html,\n  \"file_id\": $(\"User Query\").first().json.fileId,\n  \"timestamp\": new Date().toLocaleString()\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2280,
+        -180
+      ],
+      "id": "fbdf3492-7c49-4a6c-a4f9-987428db66fb",
+      "name": "HTML Output"
+    },
+    {
+      "parameters": {
+        "model": "gemma3:27b",
+        "options": {
+          "format": "json"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        300
+      ],
+      "id": "c25e15d2-d606-4d03-97b4-6492e05ef5d5",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "VH0VZAHHQ09mppMY",
+          "name": "Ollama DGX"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "gemma3:27b",
+        "options": {
+          "temperature": 1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        360,
+        -160
+      ],
+      "id": "e2a26867-d2ba-47ba-998f-16177c629646",
+      "name": "Ollama Chat Model1",
+      "credentials": {
+        "ollamaApi": {
+          "id": "VH0VZAHHQ09mppMY",
+          "name": "Ollama DGX"
+        }
+      }
     }
   ],
   "pinData": {
@@ -508,27 +561,6 @@
         ]
       ]
     },
-    "Azure OpenAI Chat Model": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "Decide Relevant Content",
-            "type": "ai_languageModel",
-            "index": 0
-          },
-          {
-            "node": "Law Consistency Checker",
-            "type": "ai_languageModel",
-            "index": 0
-          },
-          {
-            "node": "Auto-fixing Output Parser",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Retrieved Chunk Info": {
       "main": [
         [
@@ -599,9 +631,58 @@
       "main": [
         [
           {
+            "node": "HTML Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Output": {
+      "main": [
+        [
+          {
             "node": "Return",
             "type": "main",
             "index": 3
+          }
+        ]
+      ]
+    },
+    "HTML Output": {
+      "main": [
+        [
+          {
+            "node": "Save Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Law Consistency Checker",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Auto-fixing Output Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Decide Relevant Content",
+            "type": "ai_languageModel",
+            "index": 0
           }
         ]
       ]
@@ -611,7 +692,7 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "4dafcecb-f307-4f75-8cc0-aee38a5cab92",
+  "versionId": "ff749170-2ea4-4e29-a36f-02448522e31e",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "d8c8372ef7a659c4f0fd0d493f164dce23076499176f8e625c9ee5f99c7551e5"
