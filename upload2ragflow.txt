@@ -1,0 +1,114 @@
+import os
+import json
+import requests
+import shutil
+import logging
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from tqdm import tqdm
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+def read_metadata_json(json_path):
+    with open(json_path, 'r', encoding='utf-8') as f:
+        metadata = json.load(f)
+    ten_van_ban = metadata.get('ten_van_ban')
+    if not ten_van_ban:
+        raise ValueError("Field 'ten_van_ban' not found or empty in metadata.json")
+    return ten_van_ban, metadata
+
+def find_html_json_pairs(source_folder):
+    source_path = Path(source_folder)
+    file_pairs = []
+    for root, dirs, files in os.walk(source_path):
+        html_path = None
+        json_path = None
+        for file in files:
+            if file.lower() == 'content.html':
+                html_path = Path(root) / file
+            elif file.lower() == 'metadata.json':
+                json_path = Path(root) / file
+        if html_path and json_path:
+            file_pairs.append((html_path, json_path))
+    return file_pairs
+
+def upload_html_file(html_path, dataset_id, api_key, api_base_url):
+    url = f"{api_base_url}/api/v1/datasets/{dataset_id}/documents"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    files = [('file', (html_path.name, open(html_path, 'rb'), 'text/html'))]
+    response = requests.post(url, headers=headers, files=files)
+    files[0][1][1].close()
+    if response.status_code == 200:
+        data = response.json()
+        if data.get('code') == 0 and data.get('data'):
+            document_id = data['data'][0].get('id')
+            logger.info(f"Uploaded {html_path} -> Document ID: {document_id}")
+            return document_id
+        else:
+            logger.error(f"Unexpected response for {html_path}: {response.text}")
+            return None
+    else:
+        logger.error(f"Failed to upload {html_path}. Status: {response.status_code}, Response: {response.text}")
+        return None
+
+def update_document_metadata(dataset_id, document_id, metadata, html_name, api_key, api_base_url):
+    logger.info(f"Updating metadata for document {document_id}")
+    url = f"{api_base_url}/api/v1/datasets/{dataset_id}/documents/{document_id}"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "name": html_name,
+        "meta_fields": metadata
+    }
+    response = requests.put(url, headers=headers, json=payload)
+    if response.status_code == 200:
+        data = response.json()
+        if data.get('code') == 0:
+            logger.info(f"Updated metadata for document {document_id}")
+            return True
+        else:
+            logger.error(f"Unexpected response for updating {document_id}: {response.text}")
+            return False
+    else:
+        logger.error(f"Failed to update {document_id}. Status: {response.status_code}, Response: {response.text}")
+        return False
+
+def main():
+    source_folder = "./tvpl_law_only/documents"
+    dataset_id = "927193781e8511f09cac0242c0a8e007"
+    api_key = "ragflow-VmYmNhZDAyZjVmMzExZWY5NjAxMDI0Mm"
+    api_base_url = "http://localhost:8000"
+    if not os.path.exists(source_folder):
+        logger.error(f"Source folder '{source_folder}' does not exist")
+        return
+    with TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        file_pairs = find_html_json_pairs(source_folder)
+        if not file_pairs:
+            logger.info("No content.html and metadata.json pairs found")
+            return
+        logger.info(f"Found {len(file_pairs)} file pairs to process")
+        success_count = 0
+        for html_path, json_path in tqdm(file_pairs, desc="Processing file pairs"):
+            try:
+                ten_van_ban, metadata = read_metadata_json(json_path)
+                new_html_name = f"{ten_van_ban}.html"
+                new_html_path = temp_path / new_html_name
+                shutil.copy2(html_path, new_html_path)
+                document_id = upload_html_file(new_html_path, dataset_id, api_key, api_base_url)
+                if document_id:
+                    if update_document_metadata(dataset_id, document_id, metadata, "[2025] " + new_html_name, api_key, api_base_url):
+                        success_count += 1
+                    else:
+                        logger.warning(f"Skipping {html_path} due to metadata update failure")
+                else:
+                    logger.warning(f"Skipping {html_path} due to upload failure")
+            except Exception as e:
+                logger.error(f"Error processing {html_path} and {json_path}: {str(e)}")
+        logger.info(f"Processing complete. Successfully processed {success_count} out of {len(file_pairs)} file pairs")
+
+if __name__ == "__main__":
+    main()
