@@ -89,7 +89,7 @@
     },
     {
       "parameters": {
-        "jsCode": "var list_of_questions = [];\nconst original_data = $('Get Data').all();\nfor (let i=0; i<$input.all().length; i++) {\n  for (let j=0; j<$input.all()[i].json.output.length; j++) {\n    const dataset_id = original_data[i].json.data[j]['dataset_id'];\n    const document_id = original_data[i].json.data[j].document_id;\n    const chunk_id = original_data[i].json.data[j].chunk_id;\n    const context = original_data[i].json.data[j].context;\n    const new_question = $input.all()[i].json.output[j].rewritten_question;\n    const new_answer = $input.all()[i].json.output[j].answer;\n    list_of_questions.push(\n      {\n        'dataset_id': dataset_id,\n        'document_id': document_id,\n        'chunk_id': chunk_id,\n        'context': context,\n        'new_question': new_question,\n        'new_answer': new_answer\n      }\n    );\n  }\n}\nreturn list_of_questions;"
+        "jsCode": "var list_of_questions = [];\nconst original_data = $('Get Data').all();\nfor (let i=0; i<$input.all().length; i++) {\n  for (let j=0; j<$input.all()[i].json.output.length; j++) {\n    const id = original_data[i].json.data[j]['id'];\n    const dataset_id = original_data[i].json.data[j]['dataset_id'];\n    const document_id = original_data[i].json.data[j].document_id;\n    const chunk_id = original_data[i].json.data[j].chunk_id;\n    const context = original_data[i].json.data[j].context;\n    const new_question = $input.all()[i].json.output[j].rewritten_question;\n    const new_answer = $input.all()[i].json.output[j].answer;\n    list_of_questions.push(\n      {\n        'id': id,\n        'dataset_id': dataset_id,\n        'document_id': document_id,\n        'chunk_id': chunk_id,\n        'context': context,\n        'new_question': new_question,\n        'new_answer': new_answer\n      }\n    );\n  }\n}\nreturn list_of_questions;"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -285,7 +285,7 @@
             },
             {
               "id": "47a140e6-f66f-4445-811c-89cc45759b79",
-              "name": "chunk_keywords",
+              "name": "chunk_keyword",
               "value": "={{ $('Set Metadata').item.json.chunk_keywords }}",
               "type": "string"
             },
@@ -297,37 +297,37 @@
             },
             {
               "id": "6b30575c-c6e5-4e6f-9809-0fda06794d27",
-              "name": "anwser",
+              "name": "direct_answer",
               "value": "={{ $('Set Metadata').item.json.new_anser }}",
               "type": "string"
             },
             {
               "id": "a3c8a0f0-1607-4896-8c51-780949754825",
-              "name": "retrieved_chunk_1",
+              "name": "retrieved_chunks_1",
               "value": "=dataset_id: {{ $('Retrieves Chunks').item.json.data.chunks[0].dataset_id }}\ndocument_id: {{ $('Retrieves Chunks').item.json.data.chunks[0].dataset_id }}\nchunk_id: {{ $('Retrieves Chunks').item.json.data.chunks[0].id }}\n===\n{{ $('Retrieves Chunks').item.json.data.chunks[0].content }}",
               "type": "string"
             },
             {
               "id": "732584af-335e-4f3b-bb01-6205d918a9da",
-              "name": "retrieved_chunk_2",
+              "name": "retrieved_chunks_2",
               "value": "=dataset_id: {{ $('Retrieves Chunks').item.json.data.chunks[1].dataset_id }}\ndocument_id: {{ $('Retrieves Chunks').item.json.data.chunks[1].dataset_id }}\nchunk_id: {{ $('Retrieves Chunks').item.json.data.chunks[1].id }}\n===\n{{ $('Retrieves Chunks').item.json.data.chunks[0].content }}",
               "type": "string"
             },
             {
               "id": "9c196629-6f8a-4060-ae76-f96c757833e4",
-              "name": "retrieved_chunk_3",
+              "name": "retrieved_chunks_3",
               "value": "=dataset_id: {{ $('Retrieves Chunks').item.json.data.chunks[2].dataset_id }}\ndocument_id: {{ $('Retrieves Chunks').item.json.data.chunks[2].dataset_id }}\nchunk_id: {{ $('Retrieves Chunks').item.json.data.chunks[2].id }}\n===\n{{ $('Retrieves Chunks').item.json.data.chunks[2].content }}",
               "type": "string"
             },
             {
               "id": "ff6cb33f-1ae6-4c87-9db8-7161de270591",
-              "name": "retrieved_chunk_4",
+              "name": "retrieved_chunks_4",
               "value": "=dataset_id: {{ $('Retrieves Chunks').item.json.data.chunks[3].dataset_id }}\ndocument_id: {{ $('Retrieves Chunks').item.json.data.chunks[3].dataset_id }}\nchunk_id: {{ $('Retrieves Chunks').item.json.data.chunks[3].id }}\n===\n{{ $('Retrieves Chunks').item.json.data.chunks[3].content }}",
               "type": "string"
             },
             {
               "id": "b2615230-53e9-470b-b57d-a314d5f2526a",
-              "name": "retrieved_chunk_5",
+              "name": "retrieved_chunks_5",
               "value": "=dataset_id: {{ $('Retrieves Chunks').item.json.data.chunks[4].dataset_id }}\ndocument_id: {{ $('Retrieves Chunks').item.json.data.chunks[4].dataset_id }}\nchunk_id: {{ $('Retrieves Chunks').item.json.data.chunks[4].id }}\n===\n{{ $('Retrieves Chunks').item.json.data.chunks[4].content }}",
               "type": "string"
             },
@@ -335,6 +335,12 @@
               "id": "00d1328d-dbd7-4aa5-a4fa-456b68dd931d",
               "name": "augmented_answer",
               "value": "={{ $json.output.augmented_answer }}",
+              "type": "string"
+            },
+            {
+              "id": "4aa8e4b3-3d84-43cd-a330-8f38fecd93a3",
+              "name": "id",
+              "value": "={{ $('Set Metadata').item.json.id }}",
               "type": "string"
             }
           ]
@@ -388,6 +394,8 @@
     },
     {
       "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
         "options": {}
       },
       "type": "n8n-nodes-base.respondToWebhook",
@@ -400,7 +408,63 @@
       "name": "Respond to Webhook"
     }
   ],
-  "pinData": {},
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "headers": {
+            "host": "localhost:8080",
+            "connection": "keep-alive",
+            "content-type": "application/json",
+            "accept": "*/*",
+            "accept-language": "*",
+            "sec-fetch-mode": "cors",
+            "user-agent": "node",
+            "accept-encoding": "gzip, deflate",
+            "content-length": "240"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "prompt": "hello",
+            "dataset": [
+              {
+                "id": "c089a9a7-d957-4288-9dd7-9fbe0421dff7",
+                "dataset_id": "2",
+                "document_id": "202",
+                "chunk_id": "202_1",
+                "context": "Good nutrition supports overall well-being.",
+                "question": "Why is nutrition important for health?"
+              }
+            ]
+          },
+          "webhookUrl": "http://localhost:5678/webhook/5453e39d-7490-415e-9d07-0a677b00df7b",
+          "executionMode": "production"
+        }
+      }
+    ],
+    "Gather Information": [
+      {
+        "json": {
+          "dataset_id": "927193781e8511f09cac0242c0a8e007",
+          "dataset_name": "Trinq | Law 1 | General chunking, no KG, no RAPTOR",
+          "document_id": "76cafcaa1e9811f0a8b90242c0a8e007",
+          "document_name": "[2025] Luật viễn thông năm 2009.html\n===\nlinhvuc: Công nghệ thông tin\nloai_van_ban: Luật\nngay_ban_hanh: 23/11/2009\nngay_cong_bao: 27/03/2010\nngay_hieu_luc: 01/07/2010\nnguoi_ky: Nguyễn Phú Trọng\nnoi_ban_hanh: Quốc hội\nso_cong_bao: Từ số 133 đến số 134\nso_hieu_van_ban: 41/2009/QH12\nten_van_ban: Luật viễn thông năm 2009\ntinh_trang: Hết hiệu lực: 01/07/2024",
+          "chunk_id": "088f83360c81a053",
+          "chunk_keyword": "dịch vụ viễn thông,  đại lý dịch vụ viễn thông,  quyền,  nghĩa vụ,  Luật thương mại,  hệ thống thiết bị đầu cuối,  cung cấp dịch vụ,  bán lại dịch vụ,  quy định của Luật,  cơ quan nhà nước,  thẩm quyền,  vi phạm quy định,  an toàn cơ sở hạ tầng,  an ninh thông tin,  doanh nghiệp viễn thông,  hợp đồng đại lý,  thông tin về dịch vụ,  kiểm tra,  kiểm soát,  người sử dụng dịch vụ,  điều khoản 1,  điều 12,  thiết lập hệ thống,  bảo đảm an toàn,  yêu cầu doanh nghiệp,  hướng dẫn dịch vụ,  cung cấp thông tin,  quy định tại Luật này,  quyền và nghĩa vụ",
+          "question": "Trí tuệ nhân tạo là gì?",
+          "anwser": null,
+          "retrieved_chunks_1": "dataset_id: 927193781e8511f09cac0242c0a8e007\ndocument_id: 927193781e8511f09cac0242c0a8e007\nchunk_id: 46bbdecd5b710362\n===\nĐiều 3. Đối tượng quyền sở hữu trí tuệ1. Đối tượng quyền tác giả bao gồm tác phẩm văn học, nghệ thuật, khoa học; đối tượng quyền liên quan đến quyền tác giả bao gồm cuộc biểu diễn, bản ghi âm, ghi hình, chương trình phát sóng, tín hiệu vệ tinh mang chương trình được mã hoá.2. Đối tượng quyền sở hữu công nghiệp bao gồm sáng chế, kiểu dáng công nghiệp, thiết kế bố trí mạch tích hợp bán dẫn, bí mật kinh doanh, nhãn hiệu, tên thương mại và chỉ dẫn địa lý.3. Đối tượng quyền đối với giống cây trồng là giống cây trồng và vật liệu nhân giống.Điều 4. Giải thích từ ngữTrong Luật này, các từ ngữ dưới đây được hiểu như sau:1. Quyền sở hữu trí tuệ là quyền của tổ chức, cá nhân đối với tài sản trí tuệ, bao gồm quyền tác giả và quyền liên quan đến quyền tác giả, quyền sở hữu công nghiệp và quyền đối với giống cây trồng.2. Quyền tác giả là quyền của tổ chức, cá nhân đối với tác phẩm do mình sáng tạo ra hoặc sở hữu.3. Quyền liên quan đến quyền tác giả (sau đây gọi là quyền liên quan) là quyền của tổ chức, cá nhân đối với cuộc biểu diễn, bản ghi âm, ghi hình, chương trình phát sóng, tín hiệu vệ tinh mang chương trình được mã hóa.",
+          "retrieved_chunks_2": "dataset_id: 927193781e8511f09cac0242c0a8e007\ndocument_id: 927193781e8511f09cac0242c0a8e007\nchunk_id: fe005241da6d1fd3\n===\nĐiều 3. Đối tượng quyền sở hữu trí tuệ1. Đối tượng quyền tác giả bao gồm tác phẩm văn học, nghệ thuật, khoa học; đối tượng quyền liên quan đến quyền tác giả bao gồm cuộc biểu diễn, bản ghi âm, ghi hình, chương trình phát sóng, tín hiệu vệ tinh mang chương trình được mã hoá.2. Đối tượng quyền sở hữu công nghiệp bao gồm sáng chế, kiểu dáng công nghiệp, thiết kế bố trí mạch tích hợp bán dẫn, bí mật kinh doanh, nhãn hiệu, tên thương mại và chỉ dẫn địa lý.3. Đối tượng quyền đối với giống cây trồng là giống cây trồng và vật liệu nhân giống.Điều 4. Giải thích từ ngữTrong Luật này, các từ ngữ dưới đây được hiểu như sau:1. Quyền sở hữu trí tuệ là quyền của tổ chức, cá nhân đối với tài sản trí tuệ, bao gồm quyền tác giả và quyền liên quan đến quyền tác giả, quyền sở hữu công nghiệp và quyền đối với giống cây trồng.2. Quyền tác giả là quyền của tổ chức, cá nhân đối với tác phẩm do mình sáng tạo ra hoặc sở hữu.3. Quyền liên quan đến quyền tác giả (sau đây gọi là quyền liên quan) là quyền của tổ chức, cá nhân đối với cuộc biểu diễn, bản ghi âm, ghi hình, chương trình phát sóng, tín hiệu vệ tinh mang chương trình được mã hóa.",
+          "retrieved_chunks_3": "dataset_id: 927193781e8511f09cac0242c0a8e007\ndocument_id: 927193781e8511f09cac0242c0a8e007\nchunk_id: e8abaf8373c25c8c\n===\nCá nhân có quyền lựa chọn hình thức, lĩnh vực, ngành nghề kinh doanh, lập doanh nghiệp, tự do giao kết hợp đồng, thuê lao động và các quyền khác phù hợp với quy định của pháp luật.Điều 47. Quyền tự do sáng tạo1- Cá nhân có quyền tự do sáng tạo, nghiên cứu khoa học, kỹ thuật, phát minh, sáng chế, sáng kiến cải tiến kỹ thuật, hợp lý hoá sản xuất; có quyền sáng tác, phê bình văn học, nghệ thuật và tham gia các hoạt động văn hoá khác nhằm phát huy tài năng sáng tạo phù hợp với khả năng, sở trường của mình.2- Quyền tự do sáng tạo được tôn trọng và được pháp luật bảo vệ. Không ai có quyền cản trở, hạn chế quyền tự do sáng tạo của cá nhân.3- Nhà nước công nhận và bảo hộ quyền sở hữu đối với sản phẩm trí tuệ.MỤC 3NƠI CƯ TRÚĐiều 48. Nơi cư trú1- Nơi cư trú của một cá nhân là nơi người đó thường xuyên sinh sống và có hộ khẩu thường trú.Trong trường hợp cá nhân không có hộ khẩu thường trú và không có nơi thường xuyên sinh sống, thì nơi cư trú của người đó là nơi tạm trú và có đăng ký tạm trú.2- Khi không xác định được nơi cư trú của cá nhân theo quy định tại khoản 1 Điều này, thì nơi cư trú là nơi người đó đang sinh sống, làm việc hoặc nơi có tài sản hoặc nơi có phần lớn tài sản, nếu tài sản của người đó có ở nhiều nơi.",
+          "retrieved_chunks_4": "dataset_id: 927193781e8511f09cac0242c0a8e007\ndocument_id: 927193781e8511f09cac0242c0a8e007\nchunk_id: 77d3f7c590e9ceb4\n===\n6. Chủ thể quyền sở hữu trí tuệ là chủ sở hữu quyền sở hữu trí tuệ hoặc tổ chức, cá nhân được chủ sở hữu chuyển giao quyền sở hữu trí tuệ.7. Tác phẩm là sản phẩm sáng tạo trong lĩnh vực văn học, nghệ thuật và khoa học thể hiện bằng bất kỳ phương tiện hay hình thức nào.8. Tác phẩm phái sinh là tác phẩm dịch từ ngôn ngữ này sang ngôn ngữ khác, tác phẩm phóng tác, cải biên, chuyển thể, biên soạn, chú giải, tuyển chọn.9. Tác phẩm, bản ghi âm, ghi hình đã công bố là tác phẩm, bản ghi âm, ghi hình đã được phát hành với sự đồng ý của chủ sở hữu quyền tác giả, chủ sở hữu quyền liên quan để phổ biến đến công chúng với một số lượng bản sao hợp lý.10. Sao chép là việc tạo ra một hoặc nhiều bản sao của tác phẩm hoặc bản ghi âm, ghi hình bằng bất kỳ phương tiện hay hình thức nào, bao gồm cả việc tạo bản sao dưới hình thức điện tử.11. Phát sóng là việc truyền âm thanh hoặc hình ảnh hoặc cả âm thanh và hình ảnh của tác phẩm, cuộc biểu diễn, bản ghi âm, ghi hình, chương trình phát sóng đến công chúng bằng phương tiện vô tuyến hoặc hữu tuyến, bao gồm cả việc truyền qua vệ tinh để công chúng có thể tiếp nhận được tại địa điểm và thời gian do chính họ lựa chọn.",
+          "retrieved_chunks_5": "dataset_id: 927193781e8511f09cac0242c0a8e007\ndocument_id: 927193781e8511f09cac0242c0a8e007\nchunk_id: 28c2cf7e36ee873e\n===\nNhà nước trao quyền sử dụng chỉ dẫn địa lý cho tổ chức, cá nhân tiến hành việc sản xuất sản phẩm mang chỉ dẫn địa lý tại địa phương tương ứng và đưa sản phẩm đó ra thị trường. Nhà nước trực tiếp thực hiện quyền quản lý chỉ dẫn địa lý hoặc trao quyền quản lý chỉ dẫn địa lý cho tổ chức đại diện quyền lợi của tất cả các tổ chức, cá nhân được trao quyền sử dụng chỉ dẫn địa lý.Điều 122. Tác giả và quyền của tác giả sáng chế, kiểu dáng công nghiệp, thiết kế bố trí1. Tác giả sáng chế, kiểu dáng công nghiệp, thiết kế bố trí là người trực tiếp sáng tạo ra đối tượng sở hữu công nghiệp; trong trường hợp có hai người trở lên cùng nhau trực tiếp sáng tạo ra đối tượng sở hữu công nghiệp thì họ là đồng tác giả.2. Quyền nhân thân của tác giả sáng chế, kiểu dáng công nghiệp, thiết kế bố trí gồm các quyền sau đây:a) Được ghi tên là tác giả trong Bằng độc quyền sáng chế, Bằng độc quyền giải pháp hữu ích, Bằng độc quyền kiểu dáng công nghiệp và Giấy chứng nhận đăng ký thiết kế bố trí mạch tích hợp bán dẫn;b) Được nêu tên là tác giả trong các tài liệu công bố, giới thiệu về sáng chế, kiểu dáng công nghiệp, thiết kế bố trí.",
+          "augmented_answer": "Trí tuệ nhân tạo là một lĩnh vực của khoa học máy tính, trong đó máy móc được thiết kế để mô phỏng các khả năng của con người như học hỏi, suy luận, và giải quyết vấn đề. Nó bao gồm các công nghệ như máy học, xử lý ngôn ngữ tự nhiên và mạng nơron.",
+          "id": "abc"
+        }
+      }
+    ]
+  },
   "connections": {
     "Webhook": {
       "main": [
@@ -566,7 +630,7 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "171ac784-4445-4e9e-a98c-98fce24f16f6",
+  "versionId": "0001d3c4-4347-42a1-993b-1091c9236689",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "d8c8372ef7a659c4f0fd0d493f164dce23076499176f8e625c9ee5f99c7551e5"
