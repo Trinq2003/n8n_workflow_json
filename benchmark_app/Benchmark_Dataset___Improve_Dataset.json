@@ -1,0 +1,576 @@
+{
+  "name": "Benchmark Dataset | Improve Dataset",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "05441107-f417-4f3a-85b9-ae7526bd919b",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "id": "2d2ecab4-d56d-4760-a665-97e9fcee8792",
+      "name": "Webhook",
+      "webhookId": "05441107-f417-4f3a-85b9-ae7526bd919b"
+    },
+    {
+      "parameters": {
+        "jsCode": "function groupDataIntoBatches(data, batchSize = 5) {\n  const batchedData = [];\n\n  for (let i = 0; i < data.length; i += batchSize) {\n    var batch = data.slice(i, i + batchSize);\n    batchedData.push(batch);\n    }\n  return {\n    data: batchedData // Replace data with batched data\n  };\n}\n\nvar data = $input.first().json.body;\nvar json_data = data.dataset;\nvar res = [];\nvar grouped_data = groupDataIntoBatches(json_data);\nfor (const group of grouped_data.data) {\n  res.push({\n    'data': group,\n    'query': data.prompt\n  })\n}\nreturn res;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        740,
+        0
+      ],
+      "id": "757013e8-21a2-4b46-bd93-4f7450d75a54",
+      "name": "Get Data"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Number of question: {{ $json.data.length }}\n<data>\n    {{ $json.data.map((item, index)=>`\\t<item_${index+1}>\\n\\t\\t<question>\\n\\t\\t\\t${item.question}\\n\\t\\t</question>\\n\\t\\t<context>\\n\\t\\t\\t${item.context}\\n\\t\\t</context>\\n\\t</item_${index+1}>\\n`).join(\"\\n\").trim() }}\n</data>\n\n<prompt>\n    {{ $json.query.trim() }}\n</prompt>\n\nPlease generate {{ $json.data.length }} questions",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You will be given an input with {{ $json.data.length }} items, each has the following form:\n```\n<item_{the index number}>\n  <context>\n  The given context, in Vietnamese\n  </context>\n  \n  <question>\n  The original question, in Vietnamese\n  </question>\n<item_{the index number}>\n```\n\nThen you will be given a prompt:\n<prompt>\nThe user's prompt\n</prompt>\n\nYour task is to adjust the original questions (remember to pair with the given context of that question) to meet the requirements given in the user's prompt. Then you need to answer the question based on the given context.\n\n\n```\n[\n  {\n      \"rewritten_question\": \"Your rewritten question here\",\n      \"answer\": \"Your answer for the question based on the provided context will appear here\"\n  }\n]\n```\nYou **MUST** write the question using the same language of the original one, and the number of rewritten questions **MUST** equals to the number of original question. "
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.6,
+      "position": [
+        960,
+        0
+      ],
+      "id": "8fd67390-6333-4aa0-9632-1c719e9c7cce",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAzureOpenAi",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        260
+      ],
+      "id": "97652e82-2fe7-4632-ade1-e5c879f828c6",
+      "name": "Azure OpenAI Chat Model",
+      "credentials": {
+        "azureOpenAiApi": {
+          "id": "p5bVBgiTCxkJYV1Z",
+          "name": "Azure Open AI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"rewritten_question\": {\n        \"type\": \"string\"\n      },\n      \"answer\": {\n        \"type\": \"string\"\n      }\n    },\n    \"required\": [\"rewritten_question\"],\n    \"additionalProperties\": false\n  }\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        1120,
+        280
+      ],
+      "id": "d9ae4f75-cca9-4cc3-a8fc-30a74c65ad66",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "jsCode": "var list_of_questions = [];\nconst original_data = $('Get Data').all();\nfor (let i=0; i<$input.all().length; i++) {\n  for (let j=0; j<$input.all()[i].json.output.length; j++) {\n    const dataset_id = original_data[i].json.data[j]['dataset_id'];\n    const document_id = original_data[i].json.data[j].document_id;\n    const chunk_id = original_data[i].json.data[j].chunk_id;\n    const context = original_data[i].json.data[j].context;\n    const new_question = $input.all()[i].json.output[j].rewritten_question;\n    const new_answer = $input.all()[i].json.output[j].answer;\n    list_of_questions.push(\n      {\n        'dataset_id': dataset_id,\n        'document_id': document_id,\n        'chunk_id': chunk_id,\n        'context': context,\n        'new_question': new_question,\n        'new_answer': new_answer\n      }\n    );\n  }\n}\nreturn list_of_questions;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        0
+      ],
+      "id": "b459a85e-e692-4d19-8a41-443da3ad4939",
+      "name": "Pair New Questions"
+    },
+    {
+      "parameters": {
+        "url": "=http://172.30.0.1:8000/api/v1/datasets/{{ $json.dataset_id }}/documents/{{ $json.document_id }}/chunks",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "={{ $json.chunk_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2060,
+        0
+      ],
+      "id": "17507dba-77df-441f-a00b-357c4a4af3e2",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "BsiYDBYhVfKwEyaP",
+          "name": "RAGFlow Authentication"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=http://172.30.0.1:8000/api/v1/datasets/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "={{ $json.dataset_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1620,
+        0
+      ],
+      "id": "c48eee22-63ec-4b82-8e6d-4fcb9708cc06",
+      "name": "Dataset Name",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "BsiYDBYhVfKwEyaP",
+          "name": "RAGFlow Authentication"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "for (let i=0; i<$(\"Pair New Questions\").all().length;i++) {\n  $(\"Pair New Questions\").all()[i].json.dataset_name = $input.all()[i].json.data[0].name;\n}\n\nreturn $(\"Pair New Questions\").all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        0
+      ],
+      "id": "fa9c3395-1819-44e0-9aeb-597ede625f98",
+      "name": "Set Dataset Name"
+    },
+    {
+      "parameters": {
+        "jsCode": "for (let i=0; i<$(\"Set Dataset Name\").all().length;i++) {\n  $(\"Set Dataset Name\").all()[i].json.document_name = $input.all()[i].json.data.doc.name+`\\n===\\n${Object.entries($input.all()[i].json.data.doc.meta_fields).map(([k, v]) => `${k}: ${v}`).join('\\n')}`;\n  $(\"Set Dataset Name\").all()[i].json.chunk_keywords = $input.all()[i].json.data.chunks[0].important_keywords.join(\", \");\n}\n\nreturn $(\"Set Dataset Name\").all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2280,
+        0
+      ],
+      "id": "03cb280b-e566-451e-83e5-a2d6f2e22ede",
+      "name": "Set Metadata"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://172.30.0.1:8000/api/v1/retrieval",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "question",
+              "value": "={{ $json.new_question }}"
+            },
+            {
+              "name": "dataset_ids",
+              "value": "={{ [$json.dataset_id] }}"
+            },
+            {
+              "name": "top_k",
+              "value": "5"
+            },
+            {
+              "name": "similarity_threshold",
+              "value": "0.2"
+            },
+            {
+              "name": "keyword",
+              "value": "true"
+            },
+            {
+              "name": "page_size",
+              "value": "5"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2500,
+        0
+      ],
+      "id": "7cdba6e5-93f9-44b9-9246-7c3709490fdb",
+      "name": "Retrieves Chunks",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "BsiYDBYhVfKwEyaP",
+          "name": "RAGFlow Authentication"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1e5f61e0-608a-4275-a573-19f19890e357",
+              "name": "dataset_id",
+              "value": "={{ $('Set Metadata').item.json.dataset_id }}",
+              "type": "string"
+            },
+            {
+              "id": "098aba08-ad6e-4694-b0ca-6c7593fc2960",
+              "name": "dataset_name",
+              "value": "={{ $('Set Metadata').item.json.dataset_name }}",
+              "type": "string"
+            },
+            {
+              "id": "cdc1d5c7-92bc-4783-859d-4188bf4fb32e",
+              "name": "document_id",
+              "value": "={{ $('Set Metadata').item.json.document_id }}",
+              "type": "string"
+            },
+            {
+              "id": "37001efe-6686-401b-a9b5-969b6fe296c5",
+              "name": "document_name",
+              "value": "={{ $('Set Metadata').item.json.document_name }}",
+              "type": "string"
+            },
+            {
+              "id": "147ef47a-1ada-473a-b9d7-d501da968b97",
+              "name": "chunk_id",
+              "value": "={{ $('Set Metadata').item.json.chunk_id }}",
+              "type": "string"
+            },
+            {
+              "id": "47a140e6-f66f-4445-811c-89cc45759b79",
+              "name": "chunk_keywords",
+              "value": "={{ $('Set Metadata').item.json.chunk_keywords }}",
+              "type": "string"
+            },
+            {
+              "id": "eb0a47f7-4575-430b-b3da-dc244fde24e5",
+              "name": "question",
+              "value": "={{ $('Set Metadata').item.json.new_question }}",
+              "type": "string"
+            },
+            {
+              "id": "6b30575c-c6e5-4e6f-9809-0fda06794d27",
+              "name": "anwser",
+              "value": "={{ $('Set Metadata').item.json.new_anser }}",
+              "type": "string"
+            },
+            {
+              "id": "a3c8a0f0-1607-4896-8c51-780949754825",
+              "name": "retrieved_chunk_1",
+              "value": "=dataset_id: {{ $('Retrieves Chunks').item.json.data.chunks[0].dataset_id }}\ndocument_id: {{ $('Retrieves Chunks').item.json.data.chunks[0].dataset_id }}\nchunk_id: {{ $('Retrieves Chunks').item.json.data.chunks[0].id }}\n===\n{{ $('Retrieves Chunks').item.json.data.chunks[0].content }}",
+              "type": "string"
+            },
+            {
+              "id": "732584af-335e-4f3b-bb01-6205d918a9da",
+              "name": "retrieved_chunk_2",
+              "value": "=dataset_id: {{ $('Retrieves Chunks').item.json.data.chunks[1].dataset_id }}\ndocument_id: {{ $('Retrieves Chunks').item.json.data.chunks[1].dataset_id }}\nchunk_id: {{ $('Retrieves Chunks').item.json.data.chunks[1].id }}\n===\n{{ $('Retrieves Chunks').item.json.data.chunks[0].content }}",
+              "type": "string"
+            },
+            {
+              "id": "9c196629-6f8a-4060-ae76-f96c757833e4",
+              "name": "retrieved_chunk_3",
+              "value": "=dataset_id: {{ $('Retrieves Chunks').item.json.data.chunks[2].dataset_id }}\ndocument_id: {{ $('Retrieves Chunks').item.json.data.chunks[2].dataset_id }}\nchunk_id: {{ $('Retrieves Chunks').item.json.data.chunks[2].id }}\n===\n{{ $('Retrieves Chunks').item.json.data.chunks[2].content }}",
+              "type": "string"
+            },
+            {
+              "id": "ff6cb33f-1ae6-4c87-9db8-7161de270591",
+              "name": "retrieved_chunk_4",
+              "value": "=dataset_id: {{ $('Retrieves Chunks').item.json.data.chunks[3].dataset_id }}\ndocument_id: {{ $('Retrieves Chunks').item.json.data.chunks[3].dataset_id }}\nchunk_id: {{ $('Retrieves Chunks').item.json.data.chunks[3].id }}\n===\n{{ $('Retrieves Chunks').item.json.data.chunks[3].content }}",
+              "type": "string"
+            },
+            {
+              "id": "b2615230-53e9-470b-b57d-a314d5f2526a",
+              "name": "retrieved_chunk_5",
+              "value": "=dataset_id: {{ $('Retrieves Chunks').item.json.data.chunks[4].dataset_id }}\ndocument_id: {{ $('Retrieves Chunks').item.json.data.chunks[4].dataset_id }}\nchunk_id: {{ $('Retrieves Chunks').item.json.data.chunks[4].id }}\n===\n{{ $('Retrieves Chunks').item.json.data.chunks[4].content }}",
+              "type": "string"
+            },
+            {
+              "id": "00d1328d-dbd7-4aa5-a4fa-456b68dd931d",
+              "name": "augmented_answer",
+              "value": "={{ $json.output.augmented_answer }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3160,
+        0
+      ],
+      "id": "136cb102-ffed-4fcf-9f72-ee2f11fb7b65",
+      "name": "Gather Information"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.data.chunks.map((item, index)=>`\n<context_${index+1}>\n${item.content}\n</context${index+1}>\n`).join(\"\\n\") }}\n\n<question>\n{{ $('Set Metadata').item.json.new_question }}\n</question>",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are given a list of context in Vietnamese of the following form.\n\n<context_{index number}>\nThe provided Vietnamese context is here\n</context_{index number}>\n\nBased on the given context, answer the question (wrapped inside <question></question> tag) in Vietnamese. Your response should go directly to the main idea without any introduction.\n\nThe format for your output is IN JSON:\n{\n  \"augmented_answer\": \"You answer appears here\"\n}"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.6,
+      "position": [
+        2720,
+        0
+      ],
+      "id": "cf5d3c1f-a6fd-446e-84d7-42eb0cfcb4f6",
+      "name": "Augmented Answer"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"augmented_answer\": {\n\t\t\t\"type\": \"string\"\n\t\t}\n\t}\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        2880,
+        220
+      ],
+      "id": "6262e899-35c9-400a-b33e-5a8d0473a85d",
+      "name": "Structured Output Parser1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        3380,
+        0
+      ],
+      "id": "7c7e96f5-1b86-4b82-90e6-e0b4b92c36f5",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Data": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Azure OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Augmented Answer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Pair New Questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pair New Questions": {
+      "main": [
+        [
+          {
+            "node": "Dataset Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dataset Name": {
+      "main": [
+        [
+          {
+            "node": "Set Dataset Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Dataset Name": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Set Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Metadata": {
+      "main": [
+        [
+          {
+            "node": "Retrieves Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieves Chunks": {
+      "main": [
+        [
+          {
+            "node": "Augmented Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Augmented Answer": {
+      "main": [
+        [
+          {
+            "node": "Gather Information",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Augmented Answer",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gather Information": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "171ac784-4445-4e9e-a98c-98fce24f16f6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d8c8372ef7a659c4f0fd0d493f164dce23076499176f8e625c9ee5f99c7551e5"
+  },
+  "id": "aAF3WKnMPpTfINBZ",
+  "tags": []
+}
